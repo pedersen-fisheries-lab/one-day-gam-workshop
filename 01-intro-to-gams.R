@@ -134,21 +134,12 @@ draw(model_temp_k30c)
 # Here's a starting point for your model:
 
 
-model_biomass <- gam(log(total) ~ s(log10(depth), bs="tp", k = 10),
+model_biomass <- gam(log(total) ~ [...],
                       data=trawls,
                       method="REML")
 
-draw(model_biomass)
-summary(model_biomass)
-
-model_biomass_k30 <- gam(log(total) ~ s(log10(depth), bs="tp", k = 30),
-                     data=trawls,
-                     method="REML")
 
 
-
-draw(model_biomass_k30)
-summary(model_biomass_k30)
 
 
 #  Adding more than one smooth to your model ####
@@ -199,11 +190,82 @@ summary(model_tempyearf)
 
 
 model_biomass_3d <- gam(log(total) ~ s(log10(depth), bs="tp", k = 30)+
-                           s(temp_bottom, k=10) + s(year, k=10),
+                           [...],
                          data=trawls,
                          method="REML")
 
 draw(model_biomass_3d)
 summary(model_biomass_3d)
 
-# Lunch time! ####
+
+#  Modelling non-normal data ####
+
+# Let's look at a new data set for this: counts of positive influenza tests from
+# California in 4 years 
+
+flu_data <- read.csv("data/california-flu-data.csv") %>%
+  mutate(season = factor(season))
+
+
+
+# plot the data
+
+flu_plot_raw <- ggplot(flu_data, aes(x =  week_centered, y= tests_pos,color=season))+
+  facet_wrap(~season)+
+  geom_line()+
+  geom_point()+
+  scale_color_brewer(palette = "Set1")
+
+#filter to just one year for now
+flu_data_2010 <- flu_data %>%
+  filter(season=="2010-2011")
+
+# Let's try smoothing this using a Poisson model:
+
+flu_2010_tests_mod <- gam(tests_pos ~ s(week_centered, k = 15),
+                  data= flu_data_2010, 
+                  family = poisson,
+                  method = "REML")
+
+summary(flu_2010_tests_mod)
+draw(flu_2010_tests_mod)
+
+# However, we should account for the fact that the number of tests being done
+# We can do this with an offset:
+
+flu_2010_posrate_mod <- gam(tests_pos ~ s(week_centered, k = 15) + offset(log(tests_total)),
+                          data= flu_data_2010, 
+                          family = poisson,
+                          method = "REML")
+
+summary(flu_2010_posrate_mod)
+draw(flu_2010_posrate_mod)
+
+# Finally, we might want to use a cyclic smoother here, to account for the fact
+# that the start and end of the flu season may have similar positivity rates:
+
+
+flu_2010_posrate_cc_mod <- gam(tests_pos ~ s(week_centered, k = 15,bs="cc") + offset(log(tests_total)),
+                            data= flu_data_2010, 
+                            family = poisson,
+                            method = "REML")
+
+summary(flu_2010_posrate_cc_mod)
+draw(flu_2010_posrate_cc_mod)
+
+
+# ---- Exercise 3 ----
+
+# Try modelling the species richness of the trawl data using a Poisson family 
+# as a function of depth. Modify your model to add an offset for the log of 
+# area trawled 
+
+# Here's a starting point for your model:
+
+
+model_richness <- gam(richness ~ [...],
+                     data=trawls,
+                     method="REML",
+                     family = [...])
+
+
