@@ -375,7 +375,7 @@ p <- ggplot(dat, aes(x,y))+
   geom_point()+
   geom_line(aes(y=value, group=degree))+
   theme_minimal(base_size = 20)+
-  labs(title = "Cubic spline, 10 deegrees of freedom")
+  labs(title = "Cubic spline, 10 degrees of freedom")
 
 p
 
@@ -767,7 +767,7 @@ Single-level random effects are another type of smoother!
 
 You've probably seen random effects written like: 
 
-$y_{i,j} =\alpha + \beta_j + \epsilon_i$, $\beta_i \sim Normal(0, \sigma_{\beta}^2)$
+$y_{i,j} =\alpha + \beta_j + \epsilon_i$, $\beta_j \sim Normal(0, \sigma_{\beta}^2)$
 
 --
 
