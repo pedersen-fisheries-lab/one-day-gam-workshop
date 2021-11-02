@@ -56,14 +56,14 @@ This is a 3-session workshop, developed with the goal of giving you enough GAM k
 
     -   what does the intercept mean?
 
-## 3. model checking and selection (follow-up on temperature, richness, and shrimp data sets)
+## 3. prediction, uncertainty, model checking, and selection 
 
 
--   `gam.check` is yr pal
+-   using `predict` to calculate confidence intervals
 
-    -   4 plots
-    -   checking `k`
-    -   limitations with count data
+-   posterior simulation
+
+-   `gam.check` for model checking
 
 -   quantile residuals
 
@@ -75,25 +75,25 @@ This is a 3-session workshop, developed with the goal of giving you enough GAM k
 
 -   shrinkage and `select=TRUE`
 
-## 4. predictions and variance
-
--   `predict` (`exclude=`?)
--   what are those bands
--   getting summaries (abundance estimates?)
--   posterior simulation
-
-
 # Other useful resources
 
-    -   [3-day GAM workshop for DFO, a longer version of this workshop](https://github.com/pedersen-fisheries-lab/DFO-3day-gam-workshop/tree/master/slides)
-    -   [ESA GAM workshop](https://eric-pedersen.github.io/mgcv-esa-workshop/)
-    -   [Our paper on Hierarchical Generalized Additive Models](https://peerj.com/articles/6876/)
-    -   [Noam Ross's GAMs in R tutorial](https://noamross.github.io/gams-in-r-course/)
-    -   [Noam Ross's Short talk on many types of models that can fit with mgcv](https://raw.githubusercontent.com/noamross/gam-resources/master/2017-11-14-noamross-gams-nyhackr.pdf)
-    -   [Gavin Simpson's Blog: From the Bottom of the Heap](https://fromthebottomoftheheap.net/)
-    -   [Gavin Simpson's Online GAM workshop](https://www.youtube.com/watch?v=sgw4cu8hrZM&feature=youtu.be)
-    -   [David Miller's NOAA workshop](https://converged.yt/mgcv-workshop/) based on ESA
-    -   [ David Miller's Distance DSM workshop](http://workshops.distancesampling.org/online-dsm-2020/)
+  [3-day GAM workshop for DFO, a longer version of this workshop](https://github.com/pedersen-fisheries-lab/DFO-3day-gam-workshop/)
+  
+   [Our ESA GAM workshop](https://eric-pedersen.github.io/mgcv-esa-workshop/)
+   
+   [Our paper on Hierarchical Generalized Additive Models](https://peerj.com/articles/6876/)
+   
+ [Noam Ross's GAMs in R tutorial](https://noamross.github.io/gams-in-r-course/)
+ 
+ [Noam Ross's Short talk on many types of models that can fit with mgcv](https://raw.githubusercontent.com/noamross/gam-resources/master/2017-11-14-noamross-gams-nyhackr.pdf)
+ 
+ [Gavin Simpson's Blog: From the Bottom of the Heap](https://fromthebottomoftheheap.net/)
+ 
+ [Gavin Simpson's Online GAM workshop](https://www.youtube.com/watch?v=sgw4cu8hrZM&feature=youtu.be)
+ 
+[David Miller's NOAA workshop](https://converged.yt/mgcv-workshop/) based on ESA
+
+[ David Miller's Distance DSM workshop](http://workshops.distancesampling.org/online-dsm-2020/)
 
 
 
