@@ -3,7 +3,7 @@
   <head>
     <title>What are GAMs?</title>
     <meta charset="utf-8" />
-    <meta name="author" content="Eric Pedersen (with material heavily borrowed from David Miller)" />
+    <meta name="author" content="Eric Pedersen" />
     <script src="libs/header-attrs-2.8/header-attrs.js"></script>
     <link href="libs/remark-css-0.0.1/default.css" rel="stylesheet" />
     <link rel="stylesheet" href="https:/stackpath.bootstrapcdn.com/bootstrap/4.3.1/css/bootstrap.min.css" type="text/css" />
@@ -14,7 +14,7 @@
 class: inverse, middle, left, my-title-slide, title-slide
 
 # What are GAMs?
-### Eric Pedersen (with material heavily borrowed from David Miller)
+### Eric Pedersen
 ### November 2nd, 2021
 
 ---
@@ -52,7 +52,7 @@ Models that look like:
 
 `\(y_i \sim Some\ distribution(\mu_i, \sigma_i)\)`
 
-`\(link(\mu_i) = Intercept + \beta_1\cdot x_{1i} + \beta_1\cdot x_{2i} + \ldots\)`
+`\(link(\mu_i) = Intercept + \beta_1\cdot x_{1i} + \beta_2\cdot x_{2i} + \ldots\)`
 
   &lt;br /&gt;
 
@@ -65,16 +65,16 @@ Models that look like:
 
 `\(y_i \sim Some\ distribution(\mu_i, \sigma_i)\)`
 
-`\(link(\mu_i) = Intercept + \beta_1\cdot x_{1i} + \beta_1\cdot x_{2i} + \ldots\)`
+`\(link(\mu_i) = Intercept + \beta_1\cdot x_{1i} + \beta_2\cdot x_{2i} + \ldots\)`
 
   &lt;br /&gt;
 
  The model is fit (not really...) by maximizing the log-likelihood:
 
 
-`\(\text{maximize}  \sum_{i=1}^n logLik (Some\ distribution(y_i))\)`
+`\(\text{maximize}  \sum_{i=1}^n logLik (Some\ distribution(y_i|\boldsymbol{\beta})\)`
 
-`\(\text{ with respect to } Intercept, \ \beta_1,\ \beta_2, \ ...\)`
+`\(\text{ with respect to } Intercept \ (\beta_0), \ \beta_1,\ \beta_2, \ ...\)`
 
 ---
 ##  With normally distributed data (for continuous unbounded data):
@@ -82,7 +82,7 @@ Models that look like:
 
 `\(y_i = Normal(\mu_i , \sigma_i)\)`
 
-`\(Identity(\mu_i) = Intercept + \beta_1\cdot x_{1i} + \beta_1\cdot x_{2i} + \ldots\)`
+`\(Identity(\mu_i) = \beta_0 + \beta_1\cdot x_{1i} + \beta_2\cdot x_{2i} + \ldots\)`
 
 ![](01-1D-smoothing_files/figure-html/gaussplot-1.png)&lt;!-- --&gt;
 
@@ -92,7 +92,7 @@ Models that look like:
 
 `\(y_i = Poisson(\mu_i)\)`
 
-`\(\text{ln}(\mu_i) = Intercept + \beta_1\cdot x_{1i} + \beta_1\cdot x_{2i} + \ldots\)`
+`\(\text{ln}(\mu_i) = \beta_0 + \beta_1\cdot x_{1i} + \beta_2\cdot x_{2i} + \ldots\)`
 
 ![](01-1D-smoothing_files/figure-html/poisplot-1.png)&lt;!-- --&gt;
 
@@ -227,7 +227,7 @@ We want functions that fit our data well, but do not overfit: that is, ones that
 Remember from before:
 
 
-`\(\text{maximize}  \sum_{i=1}^n logLik (y_i)\)`
+`\(\text{maximize}  \sum_{i=1}^n logLik (y_i|\mathbf{\beta})\)`
 
 `\(\text{ with respect to } Intercept, \ \beta_1,\ \beta_2, \ ...\)`
 
@@ -245,7 +245,7 @@ We can modify this to add a *penalty* on the size of the model parameters:
 
 
 
-`\(\text{maximize}  \sum_{i=1}^n logLik (y_i) - \lambda\cdot \mathbf{\beta}'\mathbf{S}\mathbf{\beta}\)`
+`\(\text{maximize}  \sum_{i=1}^n logLik (y_i|\mathbf{\beta}) - \lambda\cdot \mathbf{\beta}'\mathbf{S}\mathbf{\beta}\)`
 
 `\(= \text{maximize}  \sum_{i=1}^n logLik (y_i) - \lambda\cdot \sum_{a=1}^{k}\sum_{b=1}^k \beta_a\cdot\beta_b\cdot P_{a,b}\)`
 
@@ -258,14 +258,14 @@ We can modify this to add a *penalty* on the size of the model parameters:
 
 
 
-`\(\sum_{i=1}^n logLik (y_i) - \lambda\cdot \mathbf{\beta}'\mathbf{S}\mathbf{\beta}\)`
+`\(\sum_{i=1}^n logLik (y_i|\boldsymbol{\beta}) - \lambda\cdot \boldsymbol{\beta}'\mathbf{S}\boldsymbol{\beta}\)`
 
 &lt;br /&gt;
 
 --
 
 
-The penalty `\(\lambda\)` trades off between how well the model fits the observed data ( `\(\sum_{i=1}^n logLik (y_i)\)` ), and how wiggly the fitted function is ( `\(\mathbf{\beta}'\mathbf{S}\mathbf{\beta}\)` ). 
+The penalty `\(\lambda\)` trades off between how well the model fits the observed data ( `\(\sum_{i=1}^n logLik (y_i|\boldsymbol{\beta})\)` ), and how wiggly the fitted function is ( `\(\boldsymbol{\beta}'\mathbf{S}\boldsymbol{\beta}\)` ). 
 
 &lt;br /&gt;
 --
@@ -279,9 +279,18 @@ Some combinations of parameters correspond to a penalty value of zero; these com
 
 ---
 
-# For instance, for smoothing splines:
+# How changing smoothing parameters affects the fit
 
-We can create a penalty matrix that penalizes the squared second derivative:
+![](01-1D-smoothing_files/figure-html/unnamed-chunk-8-1.png)&lt;!-- --&gt;
+
+
+---
+
+
+
+# The default smoother: thin-plate regression splines
+
+We can create a penalty matrix that penalizes the squared second derivative of the curve across the range of the observed x-values:
 
 `\(\int_{x_1}^{x_n} [f^{\prime\prime}]^2 dx = \boldsymbol{\beta}^{\mathsf{T}}\mathbf{S}\boldsymbol{\beta}\)`
 
@@ -296,6 +305,38 @@ We can create a penalty matrix that penalizes the squared second derivative:
 ![](01-1D-smoothing_files/figure-html/pen-ani1-1.png)&lt;!-- --&gt;
 
 ![](01-1D-smoothing_files/figure-html/pen-ani2-1.gif)&lt;!-- --&gt;
+
+---
+
+# Another example basis function: cyclic smoothers
+
+Bases designed to "wrap", so the smooth will have the same value at the start and end of the function
+
+
+--
+
+![](01-1D-smoothing_files/figure-html/pen-plot-cyclic-1.png)&lt;!-- --&gt;
+
+
+---
+
+![](01-1D-smoothing_files/figure-html/basis-animate-cyclic-1.gif)&lt;!-- --&gt;
+
+
+
+---
+
+# Calculating p-values, standard errors of smoothers
+
+
+The penalty `\(\lambda\)` also determines the *effective degrees of freedom* (EDF) of a smoother: EDF of a smooth with k basis functions ranges from a minimum of `\(k_{null}\)` (fully penalized) to `\(k\)` (fully unpenalized)
+
+
+
+![](01-1D-smoothing_files/figure-html/unnamed-chunk-9-1.png)&lt;!-- --&gt;
+
+
+
 
 
 ---
@@ -322,11 +363,11 @@ You've probably seen random effects written like:
 
 --
 
-* The  `\(\beta_j\)` terms are the parameters the basis functions are being scaled by
+* The  `\(\beta_j\)` terms are the random effect  estimates
 
 --
 
-* `\(\lambda = 1/\sigma_{\beta}^2\)` and the `\(S\)` matrix for a random effect is just a diagonal matrix with `\(1\)` on the diagonal (the identity matrix)
+* `\(\lambda = 1/\sigma_{\beta}^2\)` and the `\(S\)` matrix for a random effect is just a diagonal matrix with `\(1\)` on the diagonal (the identity matrix), and `\(EDF = k/(1+\lambda)\)`
 
 
 ---
@@ -345,6 +386,42 @@ You've probably seen random effects written like:
 
 
 ---
+
+# Another connection with Bayesian models
+
+
+.pull-left[ 
+
+&lt;img src="figures/Scooby doo - GAM - bayes.jpg" width="350px" /&gt;
+
+] 
+
+.pull-right[ 
+
+* Penalty matrices can also be viewed as *priors* on the shape of possible functions, with the penalty matrix equal to a multivariate normal prior on basis function coefficients:
+
+ `\(\lambda\boldsymbol{\beta}'\mathbf{S}\boldsymbol{\beta} \rightarrow p(\boldsymbol{\beta}) = MVN(0,\lambda^{-1}\mathbf{S}^{-1})\)`
+
+]
+---
+
+# Another connection with Bayesian models
+
+
+.pull-left[ 
+
+&lt;img src="figures/Scooby doo - GAM - bayes.jpg" width="350px" /&gt;
+
+] 
+
+.pull-right[ 
+
+* In this context: REML estimate of `\(\lambda\)` is equivalent to the maximum a posteriori probability (MAP) estimate of the variance, with flat priors on fixed effects (i.e. unpenalized model terms) and penalties
+* This will be useful when we look at model uncertainties later on
+
+]
+---
+
 
 # To review:
 
