@@ -203,9 +203,20 @@ summary(model_biomass_3d)
 # Let's look at a new data set for this: counts of positive influenza tests from
 # California in 4 years 
 
+
 flu_data <- read.csv("data/california-flu-data.csv") %>%
   mutate(season = factor(season))
 
+#This data consists of the following columns:
+
+# season: the flu season. Starts in early October of the first year, goes to
+#         September of the next
+# year: the year a given observation was taken in
+# week: the week of the year (from 1-52)
+# week_centered: week centered around January of the given season. Negative
+#                values correspond to weeks before January, pos to weeks after
+# tests_pos: number of tests positive for at least 1 strain of influenza that week
+# tests_total: total number of tests ran in a given week
 
 
 # plot the data
