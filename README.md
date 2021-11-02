@@ -13,7 +13,7 @@ A short course on how to fit, plot, and evaluate GAMs
     the free Desktop version for your computer.
 
   - Download the course materials as a ZIP file
-    [here](https://github.com/pedersen-fisheries-lab/DFO-3day-gam-workshop/archive/master.zip).
+    [here](https://github.com/pedersen-fisheries-lab/one-day-gam-workshop/archive/master.zip).
     Alternatively, if you have the [**usethis**](), R package, running the
     following command will download the course materials and open them:
 
