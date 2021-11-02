@@ -71,7 +71,7 @@ Models that look like:
 
 $y_i \sim Some\ distribution(\mu_i, \sigma_i)$
 
-$link(\mu_i) = Intercept + \beta_1\cdot x_{1i} + \beta_1\cdot x_{2i} + \ldots$
+$link(\mu_i) = Intercept + \beta_1\cdot x_{1i} + \beta_2\cdot x_{2i} + \ldots$
 
   <br />
 
@@ -84,16 +84,16 @@ Models that look like:
 
 $y_i \sim Some\ distribution(\mu_i, \sigma_i)$
 
-$link(\mu_i) = Intercept + \beta_1\cdot x_{1i} + \beta_1\cdot x_{2i} + \ldots$
+$link(\mu_i) = Intercept + \beta_1\cdot x_{1i} + \beta_2\cdot x_{2i} + \ldots$
 
   <br />
 
  The model is fit (not really...) by maximizing the log-likelihood:
 
 
-$\text{maximize}  \sum_{i=1}^n logLik (Some\ distribution(y_i))$
+$\text{maximize}  \sum_{i=1}^n logLik (Some\ distribution(y_i|\boldsymbol{\beta})$
 
-$\text{ with respect to } Intercept, \ \beta_1,\ \beta_2, \ ...$
+$\text{ with respect to } Intercept \ (\beta_0), \ \beta_1,\ \beta_2, \ ...$
 
 ---
 ##  With normally distributed data (for continuous unbounded data):
@@ -101,7 +101,7 @@ $\text{ with respect to } Intercept, \ \beta_1,\ \beta_2, \ ...$
 
 $y_i = Normal(\mu_i , \sigma_i)$
 
-$Identity(\mu_i) = Intercept + \beta_1\cdot x_{1i} + \beta_1\cdot x_{2i} + \ldots$
+$Identity(\mu_i) = \beta_0 + \beta_1\cdot x_{1i} + \beta_2\cdot x_{2i} + \ldots$
 
 ```{r gaussplot, fig.width=12, fig.height=6}
 set.seed(2) ## simulate some data...
@@ -129,7 +129,7 @@ print(p)
 
 $y_i = Poisson(\mu_i)$
 
-$\text{ln}(\mu_i) = Intercept + \beta_1\cdot x_{1i} + \beta_1\cdot x_{2i} + \ldots$
+$\text{ln}(\mu_i) = \beta_0 + \beta_1\cdot x_{1i} + \beta_2\cdot x_{2i} + \ldots$
 
 ```{r poisplot, fig.width=12, fig.height=6}
 set.seed(2) ## simulate some data...
@@ -222,7 +222,7 @@ dat <- tibble(x = seq(0, 1, length=50))
 bases <-  as.matrix(smoothCon(s(x, k = 6),data = dat,knots = NULL,absorb.cons = TRUE)[[1]]$X)
 
 basis_simple <- dat %>%
-  bind_cols(as.tibble(bases))%>%
+  bind_cols(as_tibble(bases))%>%
   gather(key = `basis function`,value =value, -x)
 
 
@@ -248,7 +248,7 @@ set.seed(3)
 for(i in 1:10){
   coef <- rnorm(5)
   current_basis <- bases%*%diag(coef) %>%
-    as.tibble()
+    as_tibble()
   
   max_vals <- current_basis[50,]
   max_vals <- unlist(max_vals)
@@ -400,7 +400,7 @@ We want functions that fit our data well, but do not overfit: that is, ones that
 Remember from before:
 
 
-$\text{maximize}  \sum_{i=1}^n logLik (y_i)$
+$\text{maximize}  \sum_{i=1}^n logLik (y_i|\mathbf{\beta})$
 
 $\text{ with respect to } Intercept, \ \beta_1,\ \beta_2, \ ...$
 
@@ -418,7 +418,7 @@ We can modify this to add a *penalty* on the size of the model parameters:
 
 
 
-$\text{maximize}  \sum_{i=1}^n logLik (y_i) - \lambda\cdot \mathbf{\beta}'\mathbf{S}\mathbf{\beta}$
+$\text{maximize}  \sum_{i=1}^n logLik (y_i|\mathbf{\beta}) - \lambda\cdot \mathbf{\beta}'\mathbf{S}\mathbf{\beta}$
 
 $= \text{maximize}  \sum_{i=1}^n logLik (y_i) - \lambda\cdot \sum_{a=1}^{k}\sum_{b=1}^k \beta_a\cdot\beta_b\cdot P_{a,b}$
 
@@ -431,14 +431,14 @@ $\text{ with respect to } Intercept, \ \beta_1,\ \beta_2, \ ...$
 
 
 
-$\sum_{i=1}^n logLik (y_i) - \lambda\cdot \mathbf{\beta}'\mathbf{S}\mathbf{\beta}$
+$\sum_{i=1}^n logLik (y_i|\boldsymbol{\beta}) - \lambda\cdot \boldsymbol{\beta}'\mathbf{S}\boldsymbol{\beta}$
 
 <br />
 
 --
 
 
-The penalty $\lambda$ trades off between how well the model fits the observed data ( $\sum_{i=1}^n logLik (y_i)$ ), and how wiggly the fitted function is ( $\mathbf{\beta}'\mathbf{S}\mathbf{\beta}$ ). 
+The penalty $\lambda$ trades off between how well the model fits the observed data ( $\sum_{i=1}^n logLik (y_i|\boldsymbol{\beta})$ ), and how wiggly the fitted function is ( $\boldsymbol{\beta}'\mathbf{S}\boldsymbol{\beta}$ ). 
 
 <br />
 --
@@ -452,9 +452,50 @@ Some combinations of parameters correspond to a penalty value of zero; these com
 
 ---
 
-# For instance, for smoothing splines:
+# How changing smoothing parameters affects the fit
 
-We can create a penalty matrix that penalizes the squared second derivative:
+```{r , message=FALSE, warning=FALSE,cache=TRUE,fig.width=12,fig.height=6}
+
+
+set.seed(2)
+dat_sigmoid <- tibble(x = seq(-10,10, length=50),
+       y = plogis(x,scale = 1)+rnorm(50,mean = 0,sd = 0.1))%>%
+    mutate(y = ifelse(between(x,4,8)|between(x,-10,-9),NA,y))
+
+
+p0 <- ggplot(dat_sigmoid, aes(x,y))+
+  geom_point()+
+  theme_minimal(base_size = 20)
+
+
+
+p1 <- p0 + 
+  geom_smooth(method = gam, formula= y~s(x,sp = 0,k=11),se = FALSE)+
+  labs(title = "10 basis functions\nNo smoothing")
+
+
+p2 <- p0 + 
+  geom_smooth(method = gam, formula= y~s(x,k=11),se = FALSE,method.args=list(method="REML"))+
+  labs(title = "10 basis functions\nDefault smoothing")
+
+
+
+p3 <- p0 + 
+  geom_smooth(method = gam, formula= y~s(x,sp = 1e6, k=11),se = FALSE,method.args=list(method="REML"))+
+  labs(title = "10 basis functions\nFully smoothed")
+
+p1  + p2 + p3
+
+```
+
+
+---
+
+
+
+# The default smoother: thin-plate regression splines
+
+We can create a penalty matrix that penalizes the squared second derivative of the curve across the range of the observed x-values:
 
 $\int_{x_1}^{x_n} [f^{\prime\prime}]^2 dx = \boldsymbol{\beta}^{\mathsf{T}}\mathbf{S}\boldsymbol{\beta}$
 
@@ -471,13 +512,13 @@ pen_mat <- smoothCon(s(x, k = 6),data = dat,knots = NULL,absorb.cons = TRUE)[[1]
 pen_df <- pen_mat %>%
   as.data.frame()%>%
   cbind(basis_x = paste0("V",1:5))%>%
-  as.tibble()%>%
+  as_tibble()%>%
   gather(key=basis_y, value = value,-basis_x)
 
 
 
 basis_simple <- dat %>%
-  bind_cols(as.tibble(bases))%>%
+  bind_cols(as_tibble(bases))%>%
   gather(key = `basis function`,value =value, -x)
 
 
@@ -521,7 +562,7 @@ for(i in 1:5){
   coef <- rep(0,times=5)
   coef[i] = 1
   current_basis <- bases%*%diag(coef) %>%
-    as.tibble()
+    as_tibble()
   
   current_pen <- (t(coef) %*% pen_mat %*% coef)[1,1]
   
@@ -565,6 +606,148 @@ p <- ggplot(basis_transition,
 p
 ```
 
+---
+
+# Another example basis function: cyclic smoothers
+
+Bases designed to "wrap", so the smooth will have the same value at the start and end of the function
+
+
+--
+
+```{r pen-plot-cyclic, message=FALSE, warning=FALSE,fig.width=12,fig.height=5}
+
+dat <- tibble(x = seq(0, 1, length=50))
+bases_cyclic <-  as.matrix(smoothCon(s(x, k = 6,bs="cc"),data = dat,knots = NULL,absorb.cons = TRUE)[[1]]$X) %>%
+  cbind(1)
+
+pen_mat_cyclic <- smoothCon(s(x, k = 6),data = dat,knots = NULL,absorb.cons = TRUE)[[1]]$S[[1]] 
+
+pen_df <- pen_mat_cyclic %>%
+  as.data.frame()%>%
+  cbind(basis_x = paste0("V",1:5))%>%
+  as_tibble()%>%
+  gather(key=basis_y, value = value,-basis_x)
+
+
+
+basis_simple <- dat %>%
+  bind_cols(as_tibble(bases_cyclic))%>%
+  gather(key = `basis function`,value =value, -x)
+
+
+p <- ggplot(basis_simple, aes(x, value, group = `basis function`, color = factor(`basis function`))) +
+  geom_line() + 
+  geom_hline(yintercept = 0,lty=2)+
+  scale_color_brewer("Basis function",palette = "Set1") +
+  theme_minimal(base_size = 20)+
+  theme(panel.grid = element_blank(),
+        legend.position = "bottom")
+
+S <- ggplot(pen_df, aes(basis_x, reorder(basis_y,desc(basis_y)), fill  =value)) +
+  geom_tile(color="black")+
+  scale_fill_gradient2("penalty value", low="blue",high="red")+
+  labs(x= NULL,y=NULL)+
+  theme_minimal(base_size = 20)+
+  theme(panel.grid = element_blank(),
+        legend.position = "bottom")+
+  coord_equal()
+
+p + S
+
+```
+
+
+---
+
+```{r basis-animate-cyclic, message=FALSE, warning=FALSE,cache=TRUE,fig.width=12}
+basis_transition <- list()
+basis_ends <- list()
+
+
+set.seed(3)
+
+for(i in 1:10){
+  cov_mat <- pen_mat_cyclic
+  cov_mat[5,5] <- 1e8
+  cov_mat <- solve(cov_mat)
+  coef <- rmvn(1,mu = rep(0,times=5),sigma = cov_mat)[1,]
+  current_basis <- bases_cyclic%*%diag(coef) %>%
+    as_tibble()
+  
+  max_vals <- current_basis[50,]
+  max_vals <- unlist(max_vals)
+  
+  current_basis$total  <- rowSums(current_basis)
+  
+  current_basis <- bind_cols(dat, current_basis)%>%
+    gather(key = `basis function`,value =value, -x, -total)
+  current_basis$sim <- i
+  basis_transition[[i]] <- current_basis
+  
+  basis_ends[[i]] <- tibble(x = 1.05,
+                            value = max_vals,
+                            `basis function` = paste0("V", 1:5),
+                            label = paste(`basis function`, "*", round(coef,2)),
+                            sim = i
+                            )
+}
+
+basis_transition <- bind_rows(basis_transition)
+basis_ends <- bind_rows(basis_ends)
+
+p <- ggplot(basis_transition, 
+            aes(x, value, group = `basis function`, color = factor(`basis function`))) +
+  geom_line() +
+  geom_line(aes(y=total),color= "black",size=2)+
+  geom_hline(yintercept = 0,lty=2)+
+  geom_text(data=basis_ends, aes(label = label), show.legend = F)+
+  scale_color_brewer("Basis function",palette = "Set1") +
+  theme_minimal(base_size = 20)+
+  theme(panel.grid = element_blank()) +
+  transition_states(sim,
+                    transition_length = 2,
+                    state_length = 2)
+p
+```
+
+
+
+---
+
+# Calculating p-values, standard errors of smoothers
+
+
+The penalty $\lambda$ also determines the *effective degrees of freedom* (EDF) of a smoother: EDF of a smooth with k basis functions ranges from a minimum of $k_{null}$ (fully penalized) to $k$ (fully unpenalized)
+
+
+
+```{r , message=FALSE, warning=FALSE,cache=TRUE,fig.width=12,fig.height=6}
+
+
+sig_gam <- gam(y~s(x,k=11,bs="tp"), method="REML",data= dat_sigmoid)
+
+sig_gam_edf <- round(summary(sig_gam)$s.table[,"edf"],digits = 1)
+
+p1 <- p1 +
+  labs(title = "10 basis functions\nEDF = 10")
+
+
+p2 <- p2 +
+  labs(title = paste0("10 basis functions\nEDF = ",sig_gam_edf))
+
+
+
+p3 <- p3+
+  labs(title = "10 basis functions\nEDF = 1")
+
+p1  + p2 + p3
+
+```
+
+
+
+
 
 ---
 
@@ -592,11 +775,11 @@ $y_{i,j} =\alpha + \beta_j + \epsilon_i$, $\beta_i \sim Normal(0, \sigma_{\beta}
 
 --
 
-* The  $\beta_j$ terms are the parameters the basis functions are being scaled by
+* The  $\beta_j$ terms are the random effect  estimates
 
 --
 
-* $\lambda = 1/\sigma_{\beta}^2$ and the $S$ matrix for a random effect is just a diagonal matrix with $1$ on the diagonal (the identity matrix)
+* $\lambda = 1/\sigma_{\beta}^2$ and the $S$ matrix for a random effect is just a diagonal matrix with $1$ on the diagonal (the identity matrix), and $EDF = k/(1+\lambda)$
 
 
 ---
@@ -615,6 +798,46 @@ $y_{i,j} =\alpha + \beta_j + \epsilon_i$, $\beta_i \sim Normal(0, \sigma_{\beta}
 
 
 ---
+
+# Another connection with Bayesian models
+
+
+.pull-left[ 
+
+```{r,out.width="350px"}
+knitr::include_graphics("figures/Scooby doo - GAM - bayes.jpg")
+```
+
+] 
+
+.pull-right[ 
+
+* Penalty matrices can also be viewed as *priors* on the shape of possible functions, with the penalty matrix equal to a multivariate normal prior on basis function coefficients:
+
+ $\lambda\boldsymbol{\beta}'\mathbf{S}\boldsymbol{\beta} \rightarrow p(\boldsymbol{\beta}) = MVN(0,\lambda^{-1}\mathbf{S}^{-1})$
+
+]
+---
+
+# Another connection with Bayesian models
+
+
+.pull-left[ 
+
+```{r,out.width="350px"}
+knitr::include_graphics("figures/Scooby doo - GAM - bayes.jpg")
+```
+
+] 
+
+.pull-right[ 
+
+* In this context: REML estimate of $\lambda$ is equivalent to the maximum a posteriori probability (MAP) estimate of the variance, with flat priors on fixed effects (i.e. unpenalized model terms) and penalties
+* This will be useful when we look at model uncertainties later on
+
+]
+---
+
 
 # To review:
 
