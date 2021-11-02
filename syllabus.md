@@ -4,7 +4,7 @@ title: Course syllabus
 
 # Overview
 
-This is a 3-session workshop, developed with the goal of giving you enough GAM knowledge to feel comfortable fitting and working with GAMs in your day-to-day modelling practice. I will be covering a basic intro to GAM theory, with the rest focused on practical applications and a few advanced topics that we think might be interesting.
+This is a 3-session, one-day workshop. It was developed with the goal of giving you enough GAM knowledge to feel comfortable fitting and working with GAMs in your day-to-day modelling practice, with just enough of more advanced applications to give a flavour of what GAMs can do. I will be covering a basic intro to GAM theory, with the rest focused on practical applications and a few advanced topics that I think might be interesting.
 
 # Learning Goals
 
@@ -90,8 +90,8 @@ This is a 3-session workshop, developed with the goal of giving you enough GAM k
  [Gavin Simpson's Blog: From the Bottom of the Heap](https://fromthebottomoftheheap.net/)
  
  [Gavin Simpson's Online GAM workshop](https://www.youtube.com/watch?v=sgw4cu8hrZM&feature=youtu.be)
- 
-[David Miller's NOAA workshop](https://converged.yt/mgcv-workshop/) based on ESA
+
+[David Miller's NOAA workshop](https://converged.yt/mgcv-workshop/) based on the ESA workshop
 
 [ David Miller's Distance DSM workshop](http://workshops.distancesampling.org/online-dsm-2020/)
 

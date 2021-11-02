@@ -13,27 +13,18 @@ A short course on how to fit, plot, and evaluate GAMs
     the free Desktop version for your computer.
 
   - Download the course materials as a ZIP file
-    [here](https://github.com/pedersen-fisheries-lab/one-day-gam-workshop/archive/master.zip).
+    [here](https://github.com/pedersen-fisheries-lab/one-day-gam-workshop/archive/main.zip).
     Alternatively, if you have the [**usethis**](), R package, running the
     following command will download the course materials and open them:
 
     ``` {.r}
-    usethis::use_course('pedersen-fisheries-lab/DFO-3day-gam-workshop')
+    usethis::use_course('pedersen-fisheries-lab/one-day-gam-workshop')
     ```
 
   - Install the R packages required for this course by running the following
     line of code your R console:
 
     ``` {.r}
-    install.packages(c("dplyr", "rnaturalearth", "sf", "lwgeom", "dsm", "ggplot2", "remotes", "mgcv", "tidyr"))
+    install.packages(c("dplyr", "ggplot2", "remotes", "mgcv", "tidyr"))
     remotes::install_github("gavinsimpson/gratia")
     ```
-
-### Online environment
-
-  - You can also use a free online environment rather than installing R on your
-    machine. Click here to launch an online RStudio environment with the course
-    materials and packages already installed: [![Launch
-    binder](https://mybinder.org/badge_logo.svg)](https://mybinder.org/v2/gh/pedersen-fisheries-lab/DFO-3day-gam-workshop/master?urlpath=rstudio)
-
-    (Note that this will be a temporary environment run on the free [Binder](https://mybinder.org/) service. Download and save any materials you create, as your session will not be saved after quitting.)
