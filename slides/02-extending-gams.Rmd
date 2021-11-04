@@ -641,8 +641,8 @@ Putting that together:
 
 shrimp_xyt <- gam(shrimp ~ ti(y,x, year, d=c(2,1), 
                               bs=c("tp", "cr"), k=c(20, 5)) +
-                           ti(x, y, d=2, bs="tp", k=20) +
-                           ti(year, d=1, bs="cr", k=5),
+                           s(x, y, bs="tp", k=20) +
+                           s(year,  bs="cr", k=5),
                 data=trawls,
                 family=tw,
                 method="REML")
@@ -659,25 +659,6 @@ summary(shrimp_xyt)
 
 ---
 
-# Total effects
-
-```{r ti-xyt-plot, echo=FALSE, results="hide"}
-par(mfrow=c(3,4))
-lapply(2005:2014, function (t) vis.gam(shrimp_xyt, view=c("x", "y"), cond=list(year=t),
-       plot.type="contour", asp=1, main=t, too.far=0.1))
-```
-
----
-
-# `ti(x, y, year)`
-
-```{r ti-xyt-plot-xyt, echo=FALSE, results="hide", fig.width=7}
-plot(shrimp_xyt, select=1, scheme=2, asp=1)
-
-```
-
----
-
 # `ti(x, y)` and `ti(year)`
 
 ```{r ti-xyt-plot-xy-t, echo=FALSE, results="hide", fig.width=7}
@@ -687,6 +668,16 @@ plot(shrimp_xyt, select=3, scheme=2, scale=0, seWithMean=TRUE)
 
 
 ```
+---
+
+# `ti(x, y, year)`
+
+```{r ti-xyt-plot-xyt, echo=FALSE, results="hide", fig.width=7}
+plot(shrimp_xyt, select=1, scheme=2, asp=1)
+
+```
+
+
 
 ---
 class: inverse middle center big-subsection

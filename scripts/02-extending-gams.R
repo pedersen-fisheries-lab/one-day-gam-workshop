@@ -205,10 +205,11 @@ mega_shrimp <- gam(shrimp ~ __YOUR_FORMULA_HERE__,
 
 # Spatiotemporal models ####
 
+
 shrimp_xyt <- gam(shrimp ~ ti(y,x, year, d=c(2,1), 
                               bs=c("tp", "cr"), k=c(20, 5)) +
-                    ti(x, y, d=2, bs="tp", k=20) +
-                    ti(year, d=1, bs="cr", k=5),
+                    s(x, y, bs="tp", k=20) +
+                    s(year,  bs="cr", k=5),
                   data=trawls,
                   family=tw,
                   method="REML")
@@ -216,4 +217,11 @@ shrimp_xyt <- gam(shrimp ~ ti(y,x, year, d=c(2,1),
 
 summary(shrimp_xyt)
 plot(shrimp_xyt, select=1, scheme=2, asp=1)
+
+par(mfrow=c(1, 2))
+plot(shrimp_xyt, select=2, scheme=2, asp=1)
+plot(shrimp_xyt, select=3, scheme=2, scale=0, seWithMean=TRUE)
+
+plot(shrimp_xyt, select=1, scheme=2, asp=1)
+
 
