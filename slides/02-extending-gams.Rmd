@@ -1,0 +1,712 @@
+---
+title: "Extending GAMs with interactions"
+author: "Eric Pedersen"
+date: "November 4, 2021"
+output:
+  xaringan::moon_reader:
+    css: ['default', 'https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/css/bootstrap.min.css', 'slides.css']
+    lib_dir: libs
+    nature:
+      titleSlideClass: ['inverse','middle','left',my-title-slide]
+      highlightStyle: github
+      highlightLines: true
+      countIncrementalSlides: false
+      beforeInit: "macros.js"
+      ratio: '16:9'
+---
+
+```{r setup, include=FALSE, cache=FALSE}
+options(htmltools.dir.version = FALSE)
+knitr::opts_chunk$set(cache = TRUE, dev = 'svg', echo = TRUE, message = FALSE, warning = FALSE,
+                      fig.height=6, fig.width = 1.777777*6)
+library('here')
+library('mgcv')
+library('gratia')
+library('gamair')
+library('ggplot2')
+library('purrr')
+library('mvnfast')
+library("tibble")
+library('gganimate')
+library('tidyr')
+library("knitr")
+library("viridis")
+library('readr')
+library('dplyr')
+library('gganimate')
+library('xaringan')
+library('patchwork')
+library('faraway')
+library('sf')
+## plot defaults
+theme_set(theme_minimal(base_size = 16, base_family = 'Fira Sans'))
+## constants
+anim_width <- 1000
+anim_height <- anim_width / 1.77777777
+anim_dev <- 'png'
+anim_res <- 200
+```
+
+# Reminder from Tuesday:
+
+A GLM is: 
+  - a distribution for our data + 
+  - a link function + 
+  - a linear model of the transformed mean as a function of covariates
+
+--
+
+A GAM is a GLM except:
+  - covariate functions can be nonlinear, built from basis functions of covariates
+  - Estimated with penalized likelihood, penalizing overly wiggly functions
+  
+  
+---
+
+
+# So far:
+
+- One-dimensional smooth models
+- Models with multiple separate predictors
+- Normally distributed response
+
+These are good models, but there's lots more to see!
+
+
+---
+
+# New things
+
+- distribution of the data
+  - `family=` argument
+- visually checking model assumptions when building models
+- adding dimensions to your smooths
+  - space and time
+
+
+---
+
+# Distributions
+
+- `family=` argument in `gam()`
+- see `?family.mgcv` for a list
+- what you'd expect, as for `lm()` and `glm()`
+- most useful cases:
+  - `binomial` ( yes/no, $y \in \{0, 1\}$ )
+  - `poisson` ( counts, $y \in \{0, 1, 2, \ldots\}$ )
+  - `Gamma` ( positive, $y>0$ )
+
+
+---
+
+# Special count distributions
+
+- Poisson is often not adequate for "real" counts
+- Assuming $\text{Var}(y) = \mathbb{E}(y)$ is usually incorrect
+ 
+
+```{r species-gala-plots, echo=FALSE, eval = TRUE,fig.height=4}
+
+
+species_model <- gam(Species ~ log(Area), family=poisson, data=gala)
+
+species_model_plot <- gala%>%
+  ggplot(aes(x = Area, y= Species))+
+  geom_point()+
+  geom_line(aes(y=  fitted(species_model)))+
+  scale_x_log10()+
+  labs(title = "Galapagos Island SAR\nSpecies ~ log(Area)\nfamily=Poisson")
+
+
+species_model_plot
+```
+
+---
+
+# Special count distributions
+
+- Poisson is often not adequate for "real" counts
+- Assuming $\text{Var}(y) = \mathbb{E}(y)$ is usually incorrect
+ 
+```{r species-gala-plots2, echo=FALSE, eval = TRUE, fig.height=4}
+species_resid_plot <- gala %>%
+  mutate(`Predicted mean` = fitted(species_model),
+         `Predicted Var` = `Predicted mean`, 
+         `Observed residuals` = Species-`Predicted mean`,
+         `Simulated residuals` = rpois(n = n(), lambda = `Predicted mean`)- `Predicted mean`)%>%
+  select(`Predicted mean`,`Predicted Var` ,`Observed residuals`, `Simulated residuals`)%>%
+  gather(key = "outcome", value= "residual", -`Predicted mean`, - `Predicted Var`)%>%
+  mutate(outcome =factor(outcome, levels = c("Simulated residuals","Observed residuals")))%>%
+  ggplot(aes(x= `Predicted mean`, y= residual))+
+  facet_grid(.~outcome)+
+  geom_point()+
+  geom_line(aes(y =sqrt(`Predicted Var`)))+
+  geom_line(aes(y =-sqrt(`Predicted Var`)))
+  
+species_resid_plot
+
+```
+---
+
+# Special count distributions
+
+
+Other options?
+ 
+- `quasipoisson` (count-ish, $y \geq 0$)
+  - $\text{Var}(y) = \psi\times\mathbb{E}(y)$ 
+  - awkward to check, no likelihood
+  
+--
+
+- `nb`/`negbin` ( $y \geq 0$)
+  - $\text{Var}(y) = \mathbb{E}(y) + \kappa\times\mathbb{E}(y)^2$ 
+  - models overdispersed counts
+  
+--
+
+- `tw`/`Tweedie` ( $y \geq 0$)
+  - great for CPUE-type data
+  - works on non-count positive data as well
+  - $\text{Var}\left(\text{y}\right) = \phi\mathbb{E}(\text{y})^q$
+
+---
+
+# Tweedie distribution
+
+.pull-left[
+```{r tweedie, echo=FALSE, fig.height=5, fig.width=5}
+par(ps=17)
+library(RColorBrewer)
+library(mgcv)
+
+# taken from ?mgcv::ldTweedie
+y <- seq(1e-10,10,length=1000)
+p <- seq(1.2, 1.6, by=0.2)
+phi <- 1
+fy <- exp(ldTweedie(y,mu=2,p=p[1],phi=phi)[,1])
+
+rr <- brewer.pal(8,"Dark2")
+  
+plot(y, fy, type="n", ylim=c(0,1), main="Tweedie density as q changes",
+     xlab="Count", ylab="Density")
+for (i in 1:length(p)) {
+  fy <- exp(ldTweedie(y, mu=2, p=p[i], phi=phi)[, 1])
+  lines(y, fy, col=rr[i], lwd=2.5)
+}
+
+legend(x="topright", legend=p, fill=rr, inset=0.05)
+
+```
+(NB there is a point mass at zero not plotted)
+]
+.pull-right[
+-  $\text{Var}\left(\text{y}\right) = \phi\mathbb{E}(\text{y})^q$
+- Poisson is $q=1$ 
+- We estimate $q$ and $\phi$ for `tw`
+- We set $q$ and estimate $\phi$ for `Tweedie`
+]
+
+---
+
+# Negative binomial distribution
+
+.pull-left[
+```{r negbin, echo=FALSE, fig.height=5, fig.width=5}
+y<-seq(1,12,by=1)
+disps <- seq(0.01, 1, len=5)
+
+fymat <- matrix(NA, length(y), length(disps))
+
+i <- 1
+for(disp in disps){
+  fymat[,i] <- dnbinom(y, size=disp, mu=5)
+  i <- i+1
+}
+
+plot(range(y), range(fymat), type="n", ylab="Density", xlab="Count", cex.lab=1.5,
+     main="")
+
+rr <- brewer.pal(8,"Dark2")
+
+for(i in 1:ncol(fymat)){
+  lines(y, fymat[,i], type="l", col=rr[i], lwd=2)
+}
+
+legend(x="topright", legend=disps, fill=rr, inset=0.05)
+
+```
+]
+.pull-right[
+- $\text{Var}\left(\text{count}\right) =$ $\mathbb{E}(\text{count}) + \kappa \mathbb{E}(\text{count})^2$
+- Poisson is $\kappa=0$
+- Estimate $\kappa$ for `nb`
+- Set $\kappa$ for `negbin` 
+]
+
+---
+
+# 🐟🐠🐡 Example 🐡🐠🐟
+
+.pull-left[
+- Let's look at species richness as a function of depth
+- Number of species in each trawl (counts!)
+
+```{r richness}
+trawls <- read.csv(here("data/trawl_nl.csv"))
+```
+]
+
+.pull-right[
+```{r richness-violin, fig.height=5, fig.width=5, echo=FALSE}
+ggplot(trawls, aes(x =depth, y=richness)) +
+  geom_point()+
+  scale_y_log10()+
+  labs(x="Depth (m)", y="Number of Species")
+```
+
+]
+
+---
+
+# 🐟🐠🐡 Example 🐡🐠🐟
+
+.pull-left[
+- Does richness vary with depth?
+- Let's try assuming the response is Poisson!
+
+```{r pois-rich-fit}
+rich_depthl10 <- gam(richness~s(log10(depth),k = 30), 
+                     family=poisson,
+              method="REML", 
+              data=trawls)
+```
+]
+
+.pull-right[
+```{r plot-year-rich, fig.width=5}
+plot(rich_depthl10, shade=TRUE)
+```
+]
+
+
+
+
+---
+
+# `summary` output
+
+```{r rich-sum, echo=FALSE}
+summary(rich_depthl10)
+```
+
+---
+
+# Other `family` stuff
+
+- can specify a `link=` argument
+  - (usually don't have to)
+  - `?family` has options for each distribution
+- for a fitted model `model$family`
+  - details of what was used
+  - `model$family$linkfun()` gives link function
+  - `model$family$linkinv()` gives inverse link
+
+---
+
+# How can we check whether our assumed distribution is adequate?
+
+
+```{r pois-rich-check1, fig.height=4}
+par(mfrow=c(2,2))
+gam.check(rich_depthl10)
+```
+
+---
+
+
+# How can we check whether our assumed distribution is adequate?
+
+
+```{r pois-rich-check2,fig.show="hide"}
+par(mfrow=c(2,2))
+gam.check(rich_depthl10)
+```
+
+---
+
+# How can we check whether our assumed distribution is adequate?
+
+```{r pois-rich-check3, fig.height=4}
+
+appraise(rich_depthl10)
+
+```
+
+---
+
+--- 
+
+# Let's pause the talk here to try this ourselves
+
+---
+
+class: inverse middle center big-subsection
+
+## Beyond one dimensional smooths:<br/> space, time and more
+
+---
+
+# 🦐🦐 Example 🦐🦐
+
+.pull-left[
+```{r data-load}
+trawls <- read.csv(here("data/trawl_nl.csv"))
+trawls_2010 <- filter(trawls, year==2010)
+range(trawls_2010$shrimp)
+head(trawls_2010$shrimp, 3)
+```
+
+Not normal, not integer!
+
+]
+
+.pull-right[
+
+```{r, fig.height=5, fig.width=5, echo=FALSE}
+hist(trawls_2010$shrimp, xlab="Biomass", main="")
+```
+
+]
+
+---
+
+# 🦐🗺
+
+.pull-left[
+- spatial variation!
+- how do we model this??
+- `s(long) + s(lat)` misses the interaction
+]
+
+.pull-right[
+```{r biom-space-plot, fig.height=11, echo=FALSE}
+coast <- read_sf(here("data/nl_coast.shp"))
+
+ggplot(trawls_2010) +
+  geom_point(aes(x=long, y=lat, size=shrimp)) +
+  geom_sf(data=coast) +
+  coord_sf()
+```
+]
+
+---
+
+# Adding dimensions
+
+- Thin plate regression splines (default basis)
+- `s(x, y)`
+- Assumes `x` and `y` are measured in the same units
+  - `x`, `y` projected coordinates 👍
+  - `x` temperature, `y` depth 👎
+
+---
+
+# 🦐🗺
+
+Starting with a 2D smooth, assuming data is Gaussian
+
+
+.pull-left[
+```{r shrimpmod}
+spatial_shrimp <- gam(shrimp ~ s(x, y, k =100),
+                data=trawls_2010,
+                family = gaussian,
+                method="REML")
+```
+]
+
+.pull-right[
+```{r plot-effect, fig.height=8}
+plot(spatial_shrimp, asp=1)
+```
+]
+
+---
+
+# That plot is hard to understand!
+
+.pull-left[
+```{r plot-effect-bad, fig.height=10}
+plot(spatial_shrimp, asp=1)
+
+```
+]
+
+.pull-right[
+```{r plot-effect-good, fig.height=10}
+plot(spatial_shrimp, scheme=2, asp=1)
+
+```
+]
+
+---
+
+# Using gratia:
+.left-column[
+
+```{r plot-effect-gratia, fig.height=5, fig.show='hide'}
+draw(spatial_shrimp)
+
+```
+
+]
+
+.right-column[
+```{r plot-effect-gratia2, fig.height=8, echo=FALSE}
+draw(spatial_shrimp)
+
+```
+]
+
+---
+
+# `summary` output
+
+```{r summary-spat, echo=FALSE}
+summary(spatial_shrimp)
+
+```
+
+---
+
+class: inverse middle center big-subsection
+
+## Now give it a try!
+
+
+---
+
+class: inverse middle center big-subsection
+
+## Other multi-dimensional smooths
+
+---
+
+# `s(x,y)` doesn't always work
+
+- Only works for `bs="tp"` or `bs="ts"`
+- Covariates are isotropic
+- What if we wanted to use lat/long?
+- Or, more generally: interactions between covariates?
+
+---
+
+# Enter `te()`
+
+.pull-left[
+- We can built interactions using `te()`
+- Construct 2D basis from 2 1D bases
+- Biomass as a function of temperature and depth?
+  - `te(temp_bottom, log10(depth))`
+- 💭 "marginal 1Ds, join them up"
+]
+
+.pull-right[
+```{r tensor, echo=FALSE, results='hide', fig.width=8, fig.height=6, messages=FALSE, warning=FALSE}
+b_shrimp_ll_ti <- gam(shrimp ~ ti(log10(depth), temp_bottom ) + ti(depth) + ti(temp_bottom)  ,
+                data=trawls_2010,
+                family=tw,
+                method="REML")
+
+layout(matrix(c(1,2,3,3), 2, 2), widths=c(1.5,1.5,1), height=c(1,1,2))
+opar <- par(mar=c(4, 3, 1, 2) + 0.1)
+plot(b_shrimp_ll_ti, select=3)
+plot(b_shrimp_ll_ti, select=2)
+par(mar=c(0, 0, 0, 0) + 0.1)
+vis.gam(b_shrimp_ll_ti, view=c("temp_bottom","depth"), theta=-60, phi=30, color="bw")
+par(opar)
+```
+]
+
+---
+
+# Using `te()`
+
+Just like `s()`:
+
+
+```{r te-ex}
+shrimp_te <- gam(shrimp ~ te(log10(depth), temp_bottom),
+                data=trawls_2010,
+                family=tw,
+                method="REML")
+```
+
+---
+
+# `summary`
+
+```{r te-ex-summary, echo=FALSE}
+summary(shrimp_te)
+```
+
+---
+
+# Things to fiddle with
+
+- Setting `k` in two ways:
+  - `k=5`: 5 for all covariates (total $5*5=25$)
+  - `k=c(3,5)`: per basis, in order (total $3*5=15$)
+- Setting `bs` in two  ways:
+  - `bs="tp"`: tprs for all bases
+  - `bs=c("tp", "tp")`: tprs per basis
+
+---
+
+# Pulling `te()` apart: `ti()`
+
+- Can we look at the components of the `te()`
+- `te(x, y) = ti(x, y) + ti(x) + ti(y)`
+
+```{r tiex}
+shrimp_ti <- gam(shrimp ~ ti(temp_bottom, depth) +
+                          s(temp_bottom) + s(depth),
+                data=trawls_2010,
+                family=tw,
+                method="REML")
+```
+
+---
+
+# `summary`
+
+```{r ti-ex-summary, echo=FALSE}
+summary(shrimp_ti)
+```
+
+---
+
+class: inverse middle center big-subsection
+
+## Now give it a try!
+
+
+---
+class: inverse middle center big-subsection
+
+## Building spatio-temporal models
+
+---
+
+# 🦐🗺🗓
+
+```{r biom-space-time-plot, fig.height=8, fig.width=15, echo=FALSE}
+ggplot(trawls) +
+  geom_point(aes(x=long, y=lat, size=shrimp), alpha=.5) +
+  geom_sf(data=coast) +
+  facet_wrap(~year, ncol=5)
+```
+
+
+---
+
+# Space x time
+
+- We had a 2d spatial model, add time?
+  - `te(x,y,year)` ?
+- Want that 2d smooth rather than `te(lat, long)`?
+- `d=` groups covariates
+  - `te(x, y, year, d=c(2,1))` gives `x,y` smooth and `year` smooth tensor
+- Assuming default `k=` and `bs=` for bases
+
+---
+
+# Fiddling
+
+- Often fewer temporal replicates
+  - Fewer years than unique locations
+  - `k=` smaller for temporal covariate?
+- Use cubic spline basis for time?
+  - simpler basis, even knot placement
+- When using `ti()` everything needs to match up!
+
+---
+
+# 🦐🗺🗓
+
+Putting that together:
+
+```{r ti-xyt}
+
+shrimp_xyt <- gam(shrimp ~ ti(y,x, year, d=c(2,1), 
+                              bs=c("tp", "cr"), k=c(20, 5)) +
+                           ti(x, y, d=2, bs="tp", k=20) +
+                           ti(year, d=1, bs="cr", k=5),
+                data=trawls,
+                family=tw,
+                method="REML")
+```
+
+---
+
+# `summary`
+
+```{r xyt-summary, echo=FALSE}
+summary(shrimp_xyt)
+
+```
+
+---
+
+# Total effects
+
+```{r ti-xyt-plot, echo=FALSE, results="hide"}
+par(mfrow=c(3,4))
+lapply(2005:2014, function (t) vis.gam(shrimp_xyt, view=c("x", "y"), cond=list(year=t),
+       plot.type="contour", asp=1, main=t, too.far=0.1))
+```
+
+---
+
+# `ti(x, y, year)`
+
+```{r ti-xyt-plot-xyt, echo=FALSE, results="hide", fig.width=7}
+plot(shrimp_xyt, select=1, scheme=2, asp=1)
+
+```
+
+---
+
+# `ti(x, y)` and `ti(year)`
+
+```{r ti-xyt-plot-xy-t, echo=FALSE, results="hide", fig.width=7}
+par(mfrow=c(1, 2))
+plot(shrimp_xyt, select=2, scheme=2, asp=1)
+plot(shrimp_xyt, select=3, scheme=2, scale=0, seWithMean=TRUE)
+
+
+```
+
+---
+class: inverse middle center big-subsection
+
+## Recap
+
+---
+
+# What did we learn?
+
+- set response distribution
+  - `family=` argument
+  - see `?family`
+- spatial smoothing
+  - `s(x,y)` for projected coordinates
+  - `te(lat, long)` for latitude and longitude (better to project?)
+- interactions
+  - `te(covar1, covar2, ...)`
+  - `ti()` to decompose the effects
+- space and time
+  - `te(x, y, time, d=c(2,1))`
+  - again `ti()` to decompose
+
