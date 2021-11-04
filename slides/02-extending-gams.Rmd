@@ -38,6 +38,7 @@ library('xaringan')
 library('patchwork')
 library('faraway')
 library('sf')
+library(extrafont)
 ## plot defaults
 theme_set(theme_minimal(base_size = 16, base_family = 'Fira Sans'))
 ## constants

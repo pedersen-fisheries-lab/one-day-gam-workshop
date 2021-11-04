@@ -203,22 +203,22 @@ plot(rich_depthl10, shade=TRUE)
 ## Link function: log 
 ## 
 ## Formula:
-## richness ~ s(log10(depth))
+## richness ~ s(log10(depth), k = 30)
 ## 
 ## Parametric coefficients:
 ##             Estimate Std. Error z value Pr(&gt;|z|)    
-## (Intercept) 3.155195   0.003212   982.5   &lt;2e-16 ***
+## (Intercept) 3.155047   0.003212   982.3   &lt;2e-16 ***
 ## ---
 ## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
 ## 
 ## Approximate significance of smooth terms:
 ##                   edf Ref.df Chi.sq p-value    
-## s(log10(depth)) 7.231   8.21  945.6  &lt;2e-16 ***
+## s(log10(depth)) 12.65   15.6  972.3  &lt;2e-16 ***
 ## ---
 ## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
 ## 
-## R-sq.(adj) =  0.153   Deviance explained = 15.1%
-## -REML =  12991  Scale est. = 1         n = 4152
+## R-sq.(adj) =  0.157   Deviance explained = 15.7%
+## -REML =  12983  Scale est. = 1         n = 4152
 ```
 
 ---
@@ -258,8 +258,8 @@ gam.check(rich_depthl10)
 ## Basis dimension (k) checking results. Low p-value (k-index&lt;1) may
 ## indicate that k is too low, especially if edf is close to k'.
 ## 
-##                   k'  edf k-index p-value   
-## s(log10(depth)) 29.0 12.7    0.95    0.01 **
+##                   k'  edf k-index p-value    
+## s(log10(depth)) 29.0 12.7    0.95  &lt;2e-16 ***
 ## ---
 ## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
 ```
@@ -288,8 +288,8 @@ gam.check(rich_depthl10)
 ## Basis dimension (k) checking results. Low p-value (k-index&lt;1) may
 ## indicate that k is too low, especially if edf is close to k'.
 ## 
-##                   k'  edf k-index p-value    
-## s(log10(depth)) 29.0 12.7    0.95  &lt;2e-16 ***
+##                   k'  edf k-index p-value   
+## s(log10(depth)) 29.0 12.7    0.95   0.005 **
 ## ---
 ## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
 ```
@@ -528,26 +528,26 @@ shrimp_te &lt;- gam(shrimp ~ te(log10(depth), temp_bottom),
 
 ```
 ## 
-## Family: quasipoisson 
+## Family: Tweedie(p=1.595) 
 ## Link function: log 
 ## 
 ## Formula:
-## shrimp ~ te(temp_bottom, depth)
+## shrimp ~ te(log10(depth), temp_bottom)
 ## 
 ## Parametric coefficients:
 ##             Estimate Std. Error t value Pr(&gt;|t|)    
-## (Intercept)  -1.7075     0.1205  -14.17   &lt;2e-16 ***
+## (Intercept)   1.8484     0.2531   7.304 1.22e-12 ***
 ## ---
 ## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
 ## 
 ## Approximate significance of smooth terms:
-##                        edf Ref.df    F p-value    
-## te(temp_bottom,depth) 14.2  15.96 4040  &lt;2e-16 ***
+##                                edf Ref.df     F p-value    
+## te(log10(depth),temp_bottom) 15.19  16.99 33.09  &lt;2e-16 ***
 ## ---
 ## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
 ## 
-## R-sq.(adj) =  0.351   Deviance explained = 60.3%
-## -REML = 1390.3  Scale est. = 0.42049   n = 482
+## R-sq.(adj) =  0.337   Deviance explained = 66.1%
+## -REML = 1946.5  Scale est. = 8.1292    n = 482
 ```
 
 ---
@@ -584,28 +584,26 @@ shrimp_ti &lt;- gam(shrimp ~ ti(temp_bottom, depth) +
 
 ```
 ## 
-## Family: quasipoisson 
+## Family: Tweedie(p=1.591) 
 ## Link function: log 
 ## 
 ## Formula:
-## shrimp ~ ti(temp_bottom, depth) + ti(temp_bottom) + ti(depth)
+## shrimp ~ ti(temp_bottom, depth) + s(temp_bottom) + s(depth)
 ## 
 ## Parametric coefficients:
-##             Estimate Std. Error t value Pr(&gt;|t|)    
-## (Intercept)  -2.4972     0.1234  -20.23   &lt;2e-16 ***
-## ---
-## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
+##             Estimate Std. Error t value Pr(&gt;|t|)
+## (Intercept)    1.672      1.067   1.568    0.118
 ## 
 ## Approximate significance of smooth terms:
-##                         edf Ref.df      F p-value    
-## ti(temp_bottom,depth) 6.642  7.970 2440.7  &lt;2e-16 ***
-## ti(temp_bottom)       2.978  3.266  787.2  &lt;2e-16 ***
-## ti(depth)             3.778  3.939 3017.7  &lt;2e-16 ***
+##                         edf Ref.df      F  p-value    
+## ti(temp_bottom,depth) 7.417  8.860  4.177 0.000459 ***
+## s(temp_bottom)        5.661  6.850  1.703 0.081067 .  
+## s(depth)              6.592  7.238 10.177  &lt; 2e-16 ***
 ## ---
 ## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
 ## 
-## R-sq.(adj) =  0.352   Deviance explained = 60.3%
-## -REML = 1390.3  Scale est. = 0.26728   n = 482
+## R-sq.(adj) =  0.349   Deviance explained = 66.7%
+## -REML = 1951.7  Scale est. = 8.1639    n = 482
 ```
 
 ---
@@ -678,8 +676,7 @@ shrimp_xyt &lt;- gam(shrimp ~ ti(y,x, year, d=c(2,1),
 ## 
 ## Formula:
 ## shrimp ~ ti(y, x, year, d = c(2, 1), bs = c("tp", "cr"), k = c(20, 
-##     5)) + ti(x, y, d = 2, bs = "tp", k = 20) + ti(year, d = 1, 
-##     bs = "cr", k = 5)
+##     5)) + s(x, y, bs = "tp", k = 20) + s(year, bs = "cr", k = 5)
 ## 
 ## Parametric coefficients:
 ##             Estimate Std. Error t value Pr(&gt;|t|)    
@@ -690,8 +687,8 @@ shrimp_xyt &lt;- gam(shrimp ~ ti(y,x, year, d=c(2,1),
 ## Approximate significance of smooth terms:
 ##                edf Ref.df       F p-value    
 ## ti(y,x,year) 47.65  58.59   8.144  &lt;2e-16 ***
-## ti(x,y)      18.88  19.00 180.295  &lt;2e-16 ***
-## ti(year)      3.87   3.98 108.490  &lt;2e-16 ***
+## s(x,y)       18.88  19.00 180.295  &lt;2e-16 ***
+## s(year)       3.87   3.98 108.490  &lt;2e-16 ***
 ## ---
 ## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
 ## 
