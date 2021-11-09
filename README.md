@@ -2,6 +2,8 @@
 
 A short course on how to fit, plot, and evaluate GAMs
 
+The course website URL  available at [pedersen-fisheries-lab.github.io/one-day-gam-workshop/](https://pedersen-fisheries-lab.github.io/one-day-gam-workshop/)
+
 ## Setup
 
   - You will need to install **R** and I recommend using **RStudio**. The
@@ -29,7 +31,7 @@ A short course on how to fit, plot, and evaluate GAMs
     remotes::install_github("gavinsimpson/gratia")
     ```
     
-## Day 1 info
+## Day 1
 
 
 [Introduction slides](slides/00-Course-intro.html)
@@ -42,9 +44,9 @@ A short course on how to fit, plot, and evaluate GAMs
 
 
 
-## Day 2 info
+## Day 2
 
-[Day 1 slides](slides/02-extending-gams.html)
+[Day 2 slides](slides/02-extending-gams.html)
 
 
 

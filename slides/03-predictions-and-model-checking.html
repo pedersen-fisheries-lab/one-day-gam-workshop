@@ -1,0 +1,633 @@
+<!DOCTYPE html>
+<html lang="" xml:lang="">
+  <head>
+    <title>Day 3: Testing models, predictions &amp; model uncertainty</title>
+    <meta charset="utf-8" />
+    <meta name="date" content="2021-11-09" />
+    <script src="libs/header-attrs/header-attrs.js"></script>
+    <link href="libs/remark-css/default.css" rel="stylesheet" />
+    <link href="libs/tile-view/tile-view.css" rel="stylesheet" />
+    <script src="libs/tile-view/tile-view.js"></script>
+    <link rel="stylesheet" href="https:/stackpath.bootstrapcdn.com/bootstrap/4.3.1/css/bootstrap.min.css" type="text/css" />
+    <link rel="stylesheet" href="slides.css" type="text/css" />
+  </head>
+  <body>
+    <textarea id="source">
+class: inverse, middle, left, my-title-slide, title-slide
+
+# Day 3: Testing models, predictions &amp; model uncertainty
+### November 9, 2021
+
+---
+
+
+
+
+
+
+# Today:
+
+1. Evaluating  model uncertainty and making predictions
+
+--
+
+2. Model selection methods:
+ - `select  = TRUE`
+ - AIC
+ - ANOVA
+
+--
+
+3. Model checking 
+
+---
+
+# Recap &amp;mdash; Flu data
+
+.row[
+.col-6[
+
+```r
+flu &lt;- read.csv(here('data',"california-flu-data.csv")) %&gt;%
+  mutate(season = factor(season))
+
+flu2010 &lt;- flu %&gt;%
+  filter(season=="2010-2011")
+```
+
+
+```r
+flu2010_posmod &lt;- gam(tests_pos ~ s(week_centered, k = 15) + offset(log(tests_total)),
+                            data= flu2010, 
+                            family = poisson,
+                            method = "REML")
+```
+]
+.col-6[
+![](03-predictions-and-model-checking_files/figure-html/richness-violin-1.svg)&lt;!-- --&gt;
+]
+]
+
+---
+
+# Confidence bands
+
+.row[
+.col-6[
+
+`plot()`
+
+
+```r
+plot(flu2010_posmod)
+```
+
+![](03-predictions-and-model-checking_files/figure-html/plot-richness-model-1.svg)&lt;!-- --&gt;
+]
+.col-6[
+
+`gratia::draw()`
+
+
+```r
+draw(flu2010_posmod)
+```
+
+![](03-predictions-and-model-checking_files/figure-html/draw-richness-model-1.svg)&lt;!-- --&gt;
+]
+]
+
+What do the bands represent?
+
+---
+
+# Confidence intervals for smooths
+
+Bands are a bayesian 95% credible interval on the smooth
+
+`plot.gam()` draws the band at &amp;plusmn; **2** std. err.
+
+`gratia::draw()` draws them at `\((1 - \alpha) / 2\)` upper tail probability quantile of `\(\mathcal{N}(0,1)\)`
+
+`gratia::draw()` draws them at ~ &amp;plusmn;**1.96** std. err. &amp; user can change `\(\alpha\)` via argument `ci_level`
+
+--
+
+So `gratia::draw()` draws them at ~ &amp;plusmn;**2** st.d err
+
+---
+
+# Across the function intervals
+
+The *frequentist* coverage of the intervals is not pointwise &amp;mdash; instead these credible intervals have approximately 95% coverage when *averaged* over the whole function
+
+Some places will have more than 95% coverage, other places less
+
+--
+
+Assumptions yielding this result can fail, where estimated smooth is a straight line
+
+--
+
+Correct this with `seWithMean = TRUE` in `plot.gam()` or `overall_uncertainty = TRUE` in `gratia::draw()`
+
+This essentially includes the uncertainty in the intercept in the uncertainty band
+
+---
+
+# Correcting for smoothness selection
+
+The defaults assume that the smoothness parameter(s) `\(\lambda_j\)` are *known* and *fixed*
+
+--
+
+But we estimated them
+
+--
+
+Can apply a correction for this extra uncertainty via argument `unconditional = TRUE` in both `plot.gam()` and `gratia::draw()`
+
+---
+
+# But still, what do the bands represent?
+
+
+```r
+sm_fit &lt;- evaluate_smooth(flu2010_posmod, 's(week_centered)') # tidy data on smooth
+sm_post &lt;- smooth_samples(flu2010_posmod, 's(week_centered)', n = 20, seed = 42) # more on this later
+draw(sm_fit) + geom_line(data = sm_post, aes(x = .x1, y = value, group = draw),
+                         alpha = 0.3, colour = 'red')
+```
+
+![](03-predictions-and-model-checking_files/figure-html/plot-conf-band-plus-posterior-smooths-1.svg)&lt;!-- --&gt;
+
+---
+class: inverse middle center subsection
+
+# Making predictions with uncertainty
+
+---
+
+# Predicting with `predict()`
+
+`plot.gam()` and `gratia::draw()` show the component functions of the model on the link scale
+
+--
+
+Prediction (via the `predict` function) allows us to evaluate the model at known values of covariates on different scales:
+- response scale (`type = "response"`)
+- overall link scale (`type= "link"`)
+- Predictions for individual smooth terms (`type="terms"` or `type = "iterms"`)
+- For individual basis functions
+
+--
+
+Provide `newdata` with a data frame of values of covariates
+
+---
+
+# `predict()`
+
+
+```r
+new_flu &lt;- with(flu2010, tibble(week_centered = seq(min(week_centered), max(week_centered), length.out = 100),
+                                 tests_total = 1))
+pred &lt;- predict(flu2010_posmod, newdata = new_flu, se.fit = TRUE, type = 'link')
+pred &lt;- bind_cols(new_flu, as_tibble(as.data.frame(pred)))
+pred
+```
+
+```
+## # A tibble: 100 x 4
+##    week_centered tests_total   fit se.fit
+##            &lt;dbl&gt;       &lt;dbl&gt; &lt;dbl&gt;  &lt;dbl&gt;
+##  1        -11              1 -4.65  0.358
+##  2        -10.5            1 -4.70  0.304
+##  3         -9.97           1 -4.73  0.258
+##  4         -9.45           1 -4.75  0.224
+##  5         -8.94           1 -4.75  0.201
+##  6         -8.42           1 -4.72  0.187
+##  7         -7.91           1 -4.66  0.179
+##  8         -7.39           1 -4.56  0.170
+##  9         -6.88           1 -4.44  0.159
+## 10         -6.36           1 -4.29  0.146
+## # ... with 90 more rows
+```
+
+---
+
+# `predict()` &amp;rarr; response scale
+
+
+```r
+ilink &lt;- inv_link(flu2010_posmod)                         # inverse link function
+crit &lt;- qnorm((1 - 0.89) / 2, lower.tail = FALSE) # or just `crit &lt;- 2`
+pred &lt;- mutate(pred, pos_rate = ilink(fit),
+               lwr = ilink(fit - (crit * se.fit)), # lower...
+               upr = ilink(fit + (crit * se.fit))) # upper credible interval
+pred
+```
+
+```
+## # A tibble: 100 x 7
+##    week_centered tests_total   fit se.fit pos_rate     lwr    upr
+##            &lt;dbl&gt;       &lt;dbl&gt; &lt;dbl&gt;  &lt;dbl&gt;    &lt;dbl&gt;   &lt;dbl&gt;  &lt;dbl&gt;
+##  1        -11              1 -4.65  0.358  0.00951 0.00537 0.0169
+##  2        -10.5            1 -4.70  0.304  0.00913 0.00562 0.0148
+##  3         -9.97           1 -4.73  0.258  0.00882 0.00584 0.0133
+##  4         -9.45           1 -4.75  0.224  0.00865 0.00605 0.0124
+##  5         -8.94           1 -4.75  0.201  0.00866 0.00628 0.0119
+##  6         -8.42           1 -4.72  0.187  0.00893 0.00662 0.0120
+##  7         -7.91           1 -4.66  0.179  0.00949 0.00713 0.0126
+##  8         -7.39           1 -4.56  0.170  0.0104  0.00794 0.0137
+##  9         -6.88           1 -4.44  0.159  0.0118  0.00913 0.0152
+## 10         -6.36           1 -4.29  0.146  0.0136  0.0108  0.0172
+## # ... with 90 more rows
+```
+
+---
+
+# `predict()` &amp;rarr; plot
+
+Tidy objects like this are easy to plot with `ggplot()`
+
+
+```r
+ggplot(pred, aes(x = week_centered)) +
+    geom_ribbon(aes(ymin = lwr, ymax = upr), alpha = 0.2) +
+    geom_line(aes(y = pos_rate)) + labs(y = "Test postivity rate", x = NULL)
+```
+
+![](03-predictions-and-model-checking_files/figure-html/plot-predictions-richness-1.svg)&lt;!-- --&gt;
+
+---
+
+---
+class: inverse middle center subsection
+
+# Your turn!
+
+---
+class: inverse middle center subsection
+
+# Posterior simulation
+
+---
+
+# Remember this?
+
+![](03-predictions-and-model-checking_files/figure-html/plot-conf-band-plus-posterior-smooths-1.svg)&lt;!-- --&gt;
+
+--
+
+Where did the red lines come from?
+
+---
+
+# Posterior distributions
+
+Each red line is a draw from the *posterior distribution* of the smooth
+
+Remember the `\(\beta_j\)` from the first lecture?
+
+Together they are distributed *multivariate normal* with
+
+* mean vector given by `\(\hat{\beta}_j\)`
+* covariance matrix `\(\boldsymbol{\hat{V}}_{\beta}\)`
+
+`$$\text{MVN}(\boldsymbol{\hat{\beta}}, \boldsymbol{\hat{V}}_{\beta})$$`
+
+--
+
+The model as a whole has a posterior distribution too
+
+--
+
+We can simulate data from the model by taking draws from the posterior distribution
+
+---
+
+# Posterior simulation for a smooth
+
+Sounds fancy but it's only just slightly more complicated than using `rnorm()`
+
+To do this we need a few things:
+
+1. The vector of model parameters for the smooth, `\(\boldsymbol{\hat{\beta}}\)`
+2. The covariance matrix of those parameters, `\(\boldsymbol{\hat{V}}_{\beta}\)`
+3. A matrix `\(\boldsymbol{X}_p\)` that maps parameters to the linear predictor for the smooth
+
+`$$\boldsymbol{\hat{\eta}}_p = \boldsymbol{X}_p \boldsymbol{\hat{\beta}}$$`
+
+--
+
+Let's do this for `flu2010_posmod`
+
+---
+
+# Posterior sim for a smooth &amp;mdash; step 1
+
+The vector of model parameters for the smooth, `\(\boldsymbol{\hat{\beta}}\)`
+
+
+```r
+sm_week &lt;- get_smooth(flu2010_posmod, "s(week_centered)") # extract the smooth object from model
+idx &lt;- gratia:::smooth_coefs(sm_week)    # indices of the coefs for this smooth
+idx
+```
+
+```
+##  [1]  2  3  4  5  6  7  8  9 10 11 12 13 14 15
+```
+
+```r
+beta &lt;- coef(flu2010_posmod)                     # vector of model parameters
+```
+
+---
+
+# Posterior sim for a smooth &amp;mdash; step 2
+
+The covariance matrix of the model parameters, `\(\boldsymbol{\hat{V}}_{\beta}\)`
+
+
+```r
+Vb &lt;- vcov(flu2010_posmod) # default is the bayesian covariance matrix
+```
+---
+
+# Posterior sim for a smooth &amp;mdash; step 3
+
+A matrix `\(\boldsymbol{X}_p\)` that maps parameters to the linear predictor for the smooth
+
+We get `\(\boldsymbol{X}_p\)` using the `predict()` method with `type = "lpmatrix"`
+
+
+```r
+new_weeks &lt;- with(flu2010, tibble(week_centered = seq_min_max(week_centered, n = 100),
+                                  tests_total = 1))
+Xp &lt;- predict(flu2010_posmod, newdata = new_weeks, type = 'lpmatrix')
+dim(Xp)
+```
+
+```
+## [1] 100  15
+```
+
+---
+
+# Posterior sim for a smooth &amp;mdash; step 4
+
+Take only the columns of `\(\boldsymbol{X}_p\)` that are involved in the smooth of `week_centered`
+
+
+```r
+Xp &lt;- Xp[, idx, drop = FALSE]
+dim(Xp)
+```
+
+```
+## [1] 100  14
+```
+
+---
+
+# Posterior sim for a smooth &amp;mdash; step 5
+
+Simulate parameters from the posterior distribution of the smooth of `week_centered`
+
+
+```r
+set.seed(42)
+beta_sim &lt;- rmvn(n = 20, beta[idx], Vb[idx, idx, drop = FALSE])
+dim(beta_sim)
+```
+
+```
+## [1] 20 14
+```
+
+Simulating many sets (20) of new model parameters from the estimated parameters and their uncertainty (covariance)
+
+Result is a matrix where each row is a set of new model parameters, each consistent with the fitted smooth
+
+---
+
+# Posterior sim for a smooth &amp;mdash; step 6
+
+.row[
+.col-6[
+Form `\(\boldsymbol{\hat{\eta}}_p\)`, the posterior draws for the smooth
+
+
+```r
+sm_draws &lt;- Xp %*% t(beta_sim)
+dim(sm_draws)
+```
+
+```
+## [1] 100  20
+```
+
+```r
+matplot(sm_draws, type = 'l')
+```
+
+A bit of rearranging is needed to plot with `ggplot()`
+]
+
+.col-6[
+![](03-predictions-and-model-checking_files/figure-html/richness-posterior-draws-1.svg)&lt;!-- --&gt;
+]
+
+]
+
+--
+
+Or use `smooth_samples()`
+
+---
+
+# Posterior sim for a smooth &amp;mdash; steps 1&amp;ndash;6
+
+
+```r
+sm_post &lt;- smooth_samples(flu2010_posmod, 's(week_centered)', n = 20, seed = 42)
+draw(sm_post)
+```
+
+![](03-predictions-and-model-checking_files/figure-html/plot-posterior-smooths-1.svg)&lt;!-- --&gt;
+
+---
+
+# Posterior simulation from the model
+
+Simulating from the posterior distribution of the model requires 1 modification of the recipe for a smooth and one extra step
+
+We want to simulate new values for all the parameters in the model, not just the ones involved in a particular smooth
+
+--
+
+Additionally, we could simulate *new response data* from the model and the simulated parameters (**not shown** below)
+
+---
+
+# Posterior simulation from the model
+
+
+```r
+beta &lt;- coef(flu2010_posmod)   # vector of model parameters
+Vb &lt;- vcov(flu2010_posmod)     # default is the bayesian covariance matrix
+Xp &lt;- predict(flu2010_posmod, type = 'lpmatrix')
+set.seed(42)
+beta_sim &lt;- rmvn(n = 1000, beta, Vb) # simulate parameters
+eta_p &lt;- Xp %*% t(beta_sim)        # form linear predictor values
+mu_p &lt;- inv_link(flu2010_posmod)(eta_p)    # apply inverse link function
+
+mean(mu_p[1, ]) # mean of posterior for the first observation in the data
+```
+
+```
+## [1] 0.01009361
+```
+
+```r
+quantile(mu_p[1, ], probs = c(0.025, 0.975))
+```
+
+```
+##        2.5%       97.5% 
+## 0.004696046 0.018737832
+```
+
+
+---
+class: inverse middle center subsection
+
+# Your turn!
+
+    </textarea>
+<style data-target="print-only">@media screen {.remark-slide-container{display:block;}.remark-slide-scaler{box-shadow:none;}}</style>
+<script src="https://remarkjs.com/downloads/remark-latest.min.js"></script>
+<script src="macros.js"></script>
+<script>var slideshow = remark.create({
+"highlightStyle": "github",
+"highlightLines": true,
+"countIncrementalSlides": false,
+"ratio": "16:9"
+});
+if (window.HTMLWidgets) slideshow.on('afterShowSlide', function (slide) {
+  window.dispatchEvent(new Event('resize'));
+});
+(function(d) {
+  var s = d.createElement("style"), r = d.querySelector(".remark-slide-scaler");
+  if (!r) return;
+  s.type = "text/css"; s.innerHTML = "@page {size: " + r.style.width + " " + r.style.height +"; }";
+  d.head.appendChild(s);
+})(document);
+
+(function(d) {
+  var el = d.getElementsByClassName("remark-slides-area");
+  if (!el) return;
+  var slide, slides = slideshow.getSlides(), els = el[0].children;
+  for (var i = 1; i < slides.length; i++) {
+    slide = slides[i];
+    if (slide.properties.continued === "true" || slide.properties.count === "false") {
+      els[i - 1].className += ' has-continuation';
+    }
+  }
+  var s = d.createElement("style");
+  s.type = "text/css"; s.innerHTML = "@media print { .has-continuation { display: none; } }";
+  d.head.appendChild(s);
+})(document);
+// delete the temporary CSS (for displaying all slides initially) when the user
+// starts to view slides
+(function() {
+  var deleted = false;
+  slideshow.on('beforeShowSlide', function(slide) {
+    if (deleted) return;
+    var sheets = document.styleSheets, node;
+    for (var i = 0; i < sheets.length; i++) {
+      node = sheets[i].ownerNode;
+      if (node.dataset["target"] !== "print-only") continue;
+      node.parentNode.removeChild(node);
+    }
+    deleted = true;
+  });
+})();
+(function() {
+  "use strict"
+  // Replace <script> tags in slides area to make them executable
+  var scripts = document.querySelectorAll(
+    '.remark-slides-area .remark-slide-container script'
+  );
+  if (!scripts.length) return;
+  for (var i = 0; i < scripts.length; i++) {
+    var s = document.createElement('script');
+    var code = document.createTextNode(scripts[i].textContent);
+    s.appendChild(code);
+    var scriptAttrs = scripts[i].attributes;
+    for (var j = 0; j < scriptAttrs.length; j++) {
+      s.setAttribute(scriptAttrs[j].name, scriptAttrs[j].value);
+    }
+    scripts[i].parentElement.replaceChild(s, scripts[i]);
+  }
+})();
+(function() {
+  var links = document.getElementsByTagName('a');
+  for (var i = 0; i < links.length; i++) {
+    if (/^(https?:)?\/\//.test(links[i].getAttribute('href'))) {
+      links[i].target = '_blank';
+    }
+  }
+})();
+// adds .remark-code-has-line-highlighted class to <pre> parent elements
+// of code chunks containing highlighted lines with class .remark-code-line-highlighted
+(function(d) {
+  const hlines = d.querySelectorAll('.remark-code-line-highlighted');
+  const preParents = [];
+  const findPreParent = function(line, p = 0) {
+    if (p > 1) return null; // traverse up no further than grandparent
+    const el = line.parentElement;
+    return el.tagName === "PRE" ? el : findPreParent(el, ++p);
+  };
+
+  for (let line of hlines) {
+    let pre = findPreParent(line);
+    if (pre && !preParents.includes(pre)) preParents.push(pre);
+  }
+  preParents.forEach(p => p.classList.add("remark-code-has-line-highlighted"));
+})(document);</script>
+
+<script>
+slideshow._releaseMath = function(el) {
+  var i, text, code, codes = el.getElementsByTagName('code');
+  for (i = 0; i < codes.length;) {
+    code = codes[i];
+    if (code.parentNode.tagName !== 'PRE' && code.childElementCount === 0) {
+      text = code.textContent;
+      if (/^\\\((.|\s)+\\\)$/.test(text) || /^\\\[(.|\s)+\\\]$/.test(text) ||
+          /^\$\$(.|\s)+\$\$$/.test(text) ||
+          /^\\begin\{([^}]+)\}(.|\s)+\\end\{[^}]+\}$/.test(text)) {
+        code.outerHTML = code.innerHTML;  // remove <code></code>
+        continue;
+      }
+    }
+    i++;
+  }
+};
+slideshow._releaseMath(document);
+</script>
+<!-- dynamically load mathjax for compatibility with self-contained -->
+<script>
+(function () {
+  var script = document.createElement('script');
+  script.type = 'text/javascript';
+  script.src  = 'https://mathjax.rstudio.com/latest/MathJax.js?config=TeX-MML-AM_CHTML';
+  if (location.protocol !== 'file:' && /^https?:/.test(script.src))
+    script.src  = script.src.replace(/^https?:/, '');
+  document.getElementsByTagName('head')[0].appendChild(script);
+})();
+</script>
+  </body>
+</html>

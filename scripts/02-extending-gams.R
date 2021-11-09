@@ -7,6 +7,7 @@ library('tidyr')
 library('dplyr')
 library('ggplot2')
 library('gratia')
+library('patchwork')
 
 # Loading data ####
 
@@ -42,7 +43,7 @@ ggplot(trawls, aes(x =depth, y=richness)) +
 # Does richness vary with depth?
 
 
-rich_depthl10 <- gam(richness~s(log10(depth)), 
+rich_depthl10 <- gam(richness~s(log10(depth), k=30), 
                      family=poisson,
                      method="REML", 
                      data=trawls)
@@ -59,6 +60,7 @@ gam.check(rich_depthl10)
 appraise(rich_depthl10)
 
 
+
 # ---- Exercise 3 ----
 
 # Try modelling the species richness of the trawl data using a negative binomial family 
@@ -70,7 +72,7 @@ appraise(rich_depthl10)
 rich_depthl10_negbin <- gam(richness ~ s(log10(depth), k=30),
                             data=trawls,
                             method="REML",
-                            family = [...])
+                            family = nb(theta = NULL,link = "log"))
 
 # Non-normal flu-data example ####
 
@@ -136,10 +138,19 @@ hist(trawls_2010$shrimp, xlab="Biomass", main="")
 
 spatial_shrimp <- gam(shrimp ~ s(x, y),
                       data=trawls_2010,
-                      family=nb,
                       method="REML")
 
 plot(spatial_shrimp, asp=1)
+
+
+spatial_shrimp_tw <- gam(shrimp ~ s(x, y, k=100),
+                      data=trawls_2010,
+                      family="tw",
+                      method="REML")
+
+
+draw(spatial_shrimp_tw, asp=1)
+appraise(spatial_shrimp_tw)
 
 # Models with interactions ####
 
@@ -154,7 +165,7 @@ summary(shrimp_te)
 draw(shrimp_te)
 
 shrimp_ti <- gam(shrimp ~ ti(log10(depth), temp_bottom)  +
-                   ti(temp_bottom) + ti(log10(depth)),
+                   s(temp_bottom) + s(log10(depth)),
                  data=trawls_2010,
                  family=tw,
                  method="REML")

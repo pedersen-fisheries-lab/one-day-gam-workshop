@@ -45,6 +45,7 @@ summary(model_biomass_k30)
 
 
 model_biomass_3d <- gam(log(total) ~ s(log10(depth), bs="tp", k = 30)+
+                          s(temp_bottom)+
                            s(year),
                          data=trawls,
                          method="REML")
