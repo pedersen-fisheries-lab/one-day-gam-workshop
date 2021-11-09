@@ -34,7 +34,7 @@ A short course on how to fit, plot, and evaluate GAMs
 
 [Introduction slides](slides/00-Course-intro.html)
 
-[Day 1 slides](slides/slides/01-1D-smoothing.html)
+[Day 1 slides](slides/01-1D-smoothing.html)
 
 [Day 1 script](scripts/01-intro-to-gams.R)
 
@@ -44,7 +44,7 @@ A short course on how to fit, plot, and evaluate GAMs
 
 ## Day 2 info
 
-[Day 1 slides](slides/slides/slides/02-extending-gams.html)
+[Day 1 slides](slides/02-extending-gams.html)
 
 
 
