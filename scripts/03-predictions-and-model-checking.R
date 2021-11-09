@@ -8,6 +8,7 @@ library('dplyr')
 
 # load the data
 trawls <- read.csv("data/trawl_nl.csv")
+trawls2010 <- filter(trawls, year==2010)
 
 flu_data <- read.csv("data/california-flu-data.csv") %>%
   mutate(season = factor(season))
@@ -129,4 +130,62 @@ quantile(mu_p[1, ], probs = c(0.025, 0.975))
 # 2. Plot those samples using the draw function.
 # 3. Visually evaluate where the uncertainty is the greatest for each term
 
+# Viewing concurvity ####
+
+# load the data
+trawls <- read.csv(here("data","trawl_nl.csv"))
+trawls2010 <- filter(trawls,year==2010)
+rich_tempdepth <- gam(richness ~ s(log10(depth),k=30)+s(temp_bottom) + lat, 
+                      data= trawls2010,
+                      family = poisson, method ="REML")
+draw(rich_tempdepth)
+
+concurvity(rich_tempdepth)
+
+
+# Comparing models - alternative approaches ####
+
+
+# Compare rich_tempdepth vs. rich_depth
+
+rich_tempdepth <- gam(richness ~ s(log10(depth),k=30)+s(temp_bottom) + lat, 
+                      data= trawls2010,
+                      family = poisson, method ="REML")
+
+
+summary(rich_tempdepth)
+
+
+rich_depth <- gam(richness ~ s(log10(depth),k=30) + lat, 
+                      data= trawls2010,
+                      family = poisson, method ="REML")
+
+anova(rich_depth, rich_tempdepth,test = "Chisq")
+
+AIC(rich_depth, rich_tempdepth)
+
+
+# Select=TRUE
+
+rich_tempdepth_nonull <- gam(richness ~ s(log10(depth),k=30)+s(temp_bottom), 
+                             data= trawls2010,
+                             family = poisson, method ="REML", select = TRUE)
+
+summary(rich_tempdepth_nonull)
+draw(rich_tempdepth_nonull)
+
+# Exercise 3: ####
+
+
+# Use the full trawls data set, fit a model of richness as a function of
+# depth,year, and temperature, like this:
+
+rich_yeartempdepth <- gam(richness ~ s(log10(depth),k=30)+s(year, k= 10) + s(temp_bottom), 
+                             data= trawls,
+                             family = poisson, method ="REML")
+
+# 1. Compare this model to reduced models: one bottom temperature, and one
+# excluding year and bottom temperature, using anova and AIC
+
+# 2. Refit the above model using select  =TRUE and view it using draw 
 

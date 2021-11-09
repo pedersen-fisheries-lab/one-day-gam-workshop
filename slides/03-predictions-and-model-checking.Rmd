@@ -79,7 +79,7 @@ flu2010 <- flu %>%
 ```
 
 ```{r flu-positivity}
-flu2010_posmod <- gam(tests_pos ~ s(week_centered, k = 15) + offset(log(tests_total)),
+flu2010_posmod <- gam(tests_pos ~ s(week_centered, k = 15, by = ) + offset(log(tests_total)),
                             data= flu2010, 
                             family = poisson,
                             method = "REML")
@@ -423,7 +423,7 @@ Additionally, we could simulate *new response data* from the model and the simul
 
 ```{r posterior-sim-model}
 beta <- coef(flu2010_posmod)   # vector of model parameters
-Vb <- vcov(flu2010_posmod)     # default is the bayesian covariance matrix
+Vb <- vcov(flu2010_posmod)     # default is the Bayesian covariance matrix
 Xp <- predict(flu2010_posmod, type = 'lpmatrix')
 set.seed(42)
 beta_sim <- rmvn(n = 1000, beta, Vb) # simulate parameters
@@ -434,9 +434,546 @@ mean(mu_p[1, ]) # mean of posterior for the first observation in the data
 quantile(mu_p[1, ], probs = c(0.025, 0.975))
 ```
 
+---
+
+# Posterior simulation from the model
+
+```{r posterior-sim-model-hist, fig.height = 5}
+week0_row <- which(flu2010$week_centered==0)
+ggplot(tibble(positivity_rate = mu_p[week0_row , ]), aes(x = positivity_rate)) +
+    geom_histogram() + labs(title = "Posterior distribution of positivity rates for\nthe first week of January, 2011")
+```
+
 
 ---
 class: inverse middle center subsection
 
 # Your turn!
+
+
+
+
+---
+class: inverse middle center subsection
+
+# Part 2: Model comparisons
+
+
+
+---
+
+# Are predictions or inference any good?
+
+Only if model specification matches the data-generating process
+
+```{r misspecify, echo = FALSE}
+set.seed(17)
+model_list = c("right model", 
+               "wrong distribution",
+               "heteroskedasticity",
+               "dependent data",
+               "wrong functional form",
+               "over-smoothed")
+n <- 60
+sigma=1
+x <- seq(-1,1, length=n)
+model_data <- as.data.frame(expand.grid( x=x,model=model_list))
+model_data$y <- 5*model_data$x^2 + 2*model_data$x
+for(i in model_list){
+  if(i %in% c("right model", "over-smoothed")){
+    model_data[model_data$model==i, "y"] <- model_data[model_data$model==i, "y"]+ 
+      rnorm(n,0, sigma)
+  } else if(i == "wrong distribution"){
+    model_data[model_data$model==i, "y"] <- model_data[model_data$model==i, "y"]+ 
+      rt(n,df = 2)*sigma
+  } else if(i == "heteroskedasticity"){
+    model_data[model_data$model==i, "y"] <- model_data[model_data$model==i, "y"]+  
+      rnorm(n,0, sigma*10^(model_data[model_data$model==i, "x"]))
+  } else if(i == "dependent data"){
+    model_data[model_data$model==i, "y"] <- model_data[model_data$model==i, "y"]+ 
+      arima.sim(model = list(ar=c(.7)), n = n,sd=sigma) 
+  } else if(i=="wrong functional form") {
+    model_data[model_data$model==i, "y"] <- model_data[model_data$model==i, "y"]+ 
+      rnorm(n,0, sigma) + ifelse(model_data[model_data$model==i, "x"]>0, 5,-5)
+  }
+}
+ggplot(aes(x,y), data= model_data)+
+  geom_point()+
+  geom_line(color=ifelse(model_data$model=="dependent data", "black",NA))+
+  facet_wrap(~model)+
+  geom_smooth(data = filter(model_data, model!="over-smoothed"),
+              method=gam, 
+              formula = y~s(x,k=12),
+              method.args = list(method="REML")) +
+  geom_smooth(data = filter(model_data, model=="over-smoothed"),
+              method=lm) +
+  theme(strip.text = element_text(size=16), legend.position = "none")
+```
+
+---
+background-image: url(figures/mug.jpg)
+background-size: contain
+---
+
+# How do we test for misspecification?
+
+-  Examine residuals and diagostic plots: `gam.check()` part 1
+
+-  Test for residual patterns in data: `gam.check()` part 2
+
+-  Look for confounding relationships amongst variables: `concurvity()`
+
+???
+
+---
+
+# First let's simulate some data 
+
+```{r sims, include=TRUE,echo=TRUE}
+set.seed(2)
+n <- 400
+x1 <- rnorm(n)
+x2 <- rnorm(n)
+y_val <- 1 + 2*cos(pi*x1) + 2/(1+exp(-5*(x2)))
+y_norm <- y_val + rnorm(n, 0, 0.5)
+y_negbinom <- rnbinom(n, mu = exp(y_val),size=10)
+y_binom <- rbinom(n,1,prob = exp(y_val)/(1+exp(y_val)))
+```
+
+---
+
+class: inverse middle center subsection
+
+# Using `gam.check()` part 1: Visual Checks
+
+
+---
+
+# Gaussian model on Gaussian data
+
+```{r gam_check_plots1, include=TRUE, echo=TRUE, results="hide", fig.height=5.5}
+norm_model <- gam(y_norm ~ s(x1, k=12) + s(x2, k=12), method = 'REML')
+gam.check(norm_model, rep = 500)
+```
+
+---
+
+# Negative binomial data, Poisson model
+
+```{r gam_check_plots2, include=T, echo=TRUE, results="hide", fig.height=5.5}
+pois_model <- gam(y_negbinom ~ s(x1, k=12) + s(x2, k=12), family=poisson, method= 'REML')
+gam.check(pois_model, rep = 500)
+```
+
+---
+
+# NB data, NB model
+
+```{r gam_check_plots3, include=T,echo=TRUE, results="hide", fig.height=5.5}
+negbin_model <- gam(y_negbinom ~ s(x1, k=12) + s(x2, k=12), family = nb, method = 'REML')
+gam.check(negbin_model, rep = 500)
+```
+
+
+
+
+---
+class: inverse middle center subsection
+
+# `gam.check()` part 2: do you have the right functional form?
+
+---
+
+# How good is the smooth?
+
+- Many choices influence whether a smooth is right for the data, one key one is **k**, the number of basis functions used to construct the smooth.
+
+- **k** sets the _maximum_ wiggliness of a smooth.  The smoothing penalty $(\lambda)$ remove "extra wiggliness" (_up to a point!_)
+
+- We want enough **k** to model all our complexity, but larger **k** means larger computation time (sometimes $O(n^2)$)
+
+- Set **k** per term in your model: `s(x, k=10)` or `s(x, y, k=100)`.  Default values must be checked!
+
+---
+
+# Checking basis size
+
+`gam.check()` prints diagnostics for basis size. Significant values indicate non-random residual patterns not captured by smooths.
+
+
+```{r gam_check_norm1, fig.keep="none", include=TRUE,echo=TRUE, fig.width=11, fig.height = 5.5, fig.align="center"}
+norm_model_1 <- gam(y_norm~s(x1, k = 4) + s(x2, k = 4), method = 'REML')
+gam.check(norm_model_1)
+```
+
+---
+background-image: url(figures/rookie.jpg)
+background-size: contain
+---
+
+# Checking basis size
+
+Increasing basis size can move issues to another part of the model.
+
+```{r gam_check_norm2, fig.keep="none", include=TRUE, echo=TRUE, fig.width=15, fig.height = 5.5,fig.align="center"}
+norm_model_2 <- gam(y_norm ~ s(x1, k = 12) + s(x2, k = 4), method = 'REML')
+gam.check(norm_model_2)
+```
+
+---
+
+# Checking basis size
+
+Successively check issues in all smooths.
+
+```{r gam_check_norm3, fig.keep="none", include=TRUE, echo=TRUE}
+norm_model_3 <- gam(y_norm ~ s(x1, k = 12) + s(x2, k = 12),method = 'REML')
+gam.check(norm_model_3)
+```
+
+---
+
+# Checking basis size
+
+```{r gam_check_norm4, echo = FALSE}
+p1 <- draw(norm_model_1, residual = TRUE)
+p2 <- draw(norm_model_2, residual = TRUE)
+p3 <- draw(norm_model_3, residual = TRUE)
+
+p1/p2/p3
+```
+
+---
+class: inverse center middle subsection
+
+# `concurvity()`: how independent are my variables?
+
+---
+
+# What is concurvity?
+
+- Nonlinear measure of variable relationships, similar to co-linearity
+
+- Generally a property of a _model_ and data, not data alone
+
+- In linear models, we may be concerned about co-linear variables, which we can find with `cor(data)`, or `pairs(data)` of the data
+
+- When using GAMs, we use `concurvity(model)`
+
+
+
+???
+
+Concurvity must be a model property because it depends on the type of curves allowed
+
+---
+
+# Effects of concurvity
+
+Independent variables yield nice, separable nonlinear GAM terms
+
+```{r concurve1,fig.width=12, fig.height=5, echo = FALSE}
+library(mgcv)
+set.seed(1)
+n=200
+alpha = 0
+x1_cc = rnorm(n)
+mean_constant = alpha
+var_constant = alpha^2
+x2_cc = alpha*x1_cc^2 - mean_constant + rnorm(n,0,1-var_constant)
+par(mfrow=c(1,3), cin=1)
+plot(x1_cc,x2_cc)
+y = 3 + cos(pi*x1_cc) + 1/(1+exp(-5*(x2_cc)))
+m1 = gam(y~s(x1_cc)+s(x2_cc),method= "REML")
+just_fine = m1
+plot(m1,scale=0)
+```
+
+---
+
+# Effects of concurvity
+
+Modest dependence between predictor variables increases uncertainty.
+
+```{r concurve2,fig.width=12, fig.height=5, echo = FALSE}
+set.seed(1)
+n=200
+max_val = sqrt(pi/(pi-2))
+alpha = 0.66
+x1_cc = rnorm(n)
+mean_constant = alpha
+var_constant = alpha^2
+x2_cc = alpha*x1_cc^2-mean_constant + rnorm(n,0,1-var_constant)
+par(mfrow=c(1,3))
+plot(x1_cc,x2_cc)
+y = 3 + cos(pi*x1_cc) + 1/(1+exp(-5*(x2_cc)))
+m2 = gam(y~s(x1_cc)+s(x2_cc),method= "REML")
+some_model = m2
+plot(m2, scale=0)
+```
+
+---
+
+# Effects of concurvity
+
+Smooth forms and intervals go <span style="color:purple;">**buck wild**</span> under strong dependence. 
+
+```{r concurve4,fig.width=12, fig.height=5, echo = FALSE}
+set.seed(1)
+alpha = .99
+mean_constant = alpha
+var_constant = alpha^2
+x2_cc = alpha*x1_cc^2-mean_constant + rnorm(n,0,1-var_constant)
+par(mfrow=c(1,3))
+plot(x1_cc,x2_cc)
+y = 3 + cos(pi*x1_cc) + 1/(1+exp(-5*(x2_cc)))
+m3 = gam(y~s(x1_cc)+s(x2_cc),method= "REML")
+uh_oh = m3
+plot(m3,scale=0)
+```
+
+---
+
+# Use `concurvity()` to diagnose
+
+(It's easier to read with `round()`)
+
+
+
+.pull-left[
+```{r concurvefn1 }
+round(concurvity(some_model), 2)
+```
+
+- `full=TRUE` how much each smooth is explained by _all_ others
+- `full=FALSE` how much each smooth is explained by _each_ other 
+- 3 estimates provided
+]
+
+.pull-right[
+```{r concurvefn2 }
+lapply(
+  concurvity(some_model, full= FALSE),
+  round, 2)
+```
+]
+
+---
+
+# Concurvity: Remember
+
+- Can make your model unstable to small changes
+
+- `cor(data)` not sufficient: use the `concurvity(model)` function
+
+- Not always obvious from plots of smooths!!
+
+
+---
+
+# Let's look at an example using the richness data
+
+
+
+.pull-left[
+```{r rich-spatial,fig.show="hide"}
+
+# load the data
+trawls <- read.csv(here("data","trawl_nl.csv"))
+trawls2010 <- filter(trawls,year==2010)
+rich_tempdepth <- gam(richness ~ s(log10(depth),k=30)+s(temp_bottom) + lat, 
+                       data= trawls2010,
+                       family = poisson, method ="REML")
+draw(rich_tempdepth)
+```
+
+]
+
+
+.pull-right[
+
+```{r rich-spatial2,echo=FALSE, include= TRUE,fig.show='as.is',fig.height=8}
+
+
+draw(rich_tempdepth)
+```
+
+]
+
+
+
+---
+
+
+
+.pull-left[
+```{r eval = FALSE}
+
+concurvity(rich_tempdepth)
+```
+
+]
+
+
+.pull-right[
+
+```{r echo=FALSE, include= TRUE}
+
+
+concurvity(rich_tempdepth)
+```
+
+]
+
+
+---
+class: inverse middle center subsection
+
+# part 3: Model selection
+
+
+---
+
+# How do we choose between alternative models?
+
+- Models can differ in # of predictors, basis functions used, family, etc. 
+
+- When comparing models, we have to account for model fit and the flexibility of each model
+
+- MGCV uses the effective degrees of freedom of smooth terms when comparing models via ANOVA or AIC
+
+---
+
+
+# How do we choose between alternative models?
+
+Possible approaches:
+
+ - Look at terms within a model
+ - AIC 
+ - ANOVA table 
+ - Fitting full model and using `select = TRUE` option. 
+ 
+---
+
+# A few caveats first: 
+
+* you cannot compare models that differ in the number of data points, or in type of data (assuming count vs. continuous data, for example)
+
+* p-values for terms within each model are approximate, from ANOVA even more approximate
+
+* Make sure to use the same method ("ML", "REML" or "GCV.Cp") for all models to be compared
+
+
+---
+
+# Viewing smooth terms within a model:
+
+```{r}
+rich_tempdepth <- gam(richness ~ s(log10(depth),k=30)+s(temp_bottom), 
+                      data= trawls2010,
+                      family = poisson, method ="REML")
+
+summary(rich_tempdepth)
+
+```
+
+---
+
+# Using ANOVA to compare two models
+
+
+```{r}
+rich_depth <- gam(richness ~ s(log10(depth),k=30), 
+                      data= trawls2010,
+                      family = poisson, method ="REML")
+
+anova(rich_depth, rich_tempdepth,test = "Chisq")
+
+```
+
+
+---
+
+# Using ANOVA to compare two models
+
+
+Note for anova.gam: This assumes that models do not differ in terms that can be completely smoothed away (like simple random effects). See `?anova.gam` for more details
+
+
+---
+
+# Using AIC to compare two models
+
+
+
+.pull-left[
+
+```{r}
+AIC(rich_depth, rich_tempdepth)
+
+```
+]
+
+
+
+.pull-right[
+
+* A corrected version of AIC (2k - 2logLik) to account for reduced degrees of freedom from smoothing, and uncertainty in smoothing parameters.
+
+* See ?`mgcv::AIC.gam` for more details
+
+
+]
+
+---
+background-image: url(figures/wood-quote.png)
+background-size: contain
+
+---
+
+
+# Final method: selection of smooth terms within a model
+
+* If we think a given smooth term can be removed from the model, it should also be possible to penalize the term to zero within the model
+
+--
+
+* Only works if a given term is penalized; remember from day 1 that some function shapes are not penalized (are in the null space of the model)
+
+--
+
+* If we set `select=TRUE` this adds a penalty to the null space of all models, letting mgcv remove the term if need be
+
+
+---
+
+
+```{r}
+rich_tempdepth_nonull <- gam(richness ~ s(log10(depth),k=30)+s(temp_bottom), 
+                      data= trawls2010,
+                      family = poisson, method ="REML", select = TRUE)
+
+summary(rich_tempdepth_nonull)
+
+```
+
+
+---
+
+
+```{r}
+
+draw(rich_tempdepth_nonull)
+
+```
+
+
+
+
+---
+
+class: inverse middle center subsection
+
+# Final exercise
 

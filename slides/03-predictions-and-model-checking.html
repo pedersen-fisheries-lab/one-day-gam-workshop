@@ -57,7 +57,7 @@ flu2010 &lt;- flu %&gt;%
 
 
 ```r
-flu2010_posmod &lt;- gam(tests_pos ~ s(week_centered, k = 15) + offset(log(tests_total)),
+flu2010_posmod &lt;- gam(tests_pos ~ s(week_centered, k = 15, by = ) + offset(log(tests_total)),
                             data= flu2010, 
                             family = poisson,
                             method = "REML")
@@ -477,7 +477,7 @@ Additionally, we could simulate *new response data* from the model and the simul
 
 ```r
 beta &lt;- coef(flu2010_posmod)   # vector of model parameters
-Vb &lt;- vcov(flu2010_posmod)     # default is the bayesian covariance matrix
+Vb &lt;- vcov(flu2010_posmod)     # default is the Bayesian covariance matrix
 Xp &lt;- predict(flu2010_posmod, type = 'lpmatrix')
 set.seed(42)
 beta_sim &lt;- rmvn(n = 1000, beta, Vb) # simulate parameters
@@ -500,12 +500,614 @@ quantile(mu_p[1, ], probs = c(0.025, 0.975))
 ## 0.004696046 0.018737832
 ```
 
+---
+
+# Posterior simulation from the model
+
+
+```r
+week0_row &lt;- which(flu2010$week_centered==0)
+ggplot(tibble(positivity_rate = mu_p[week0_row , ]), aes(x = positivity_rate)) +
+    geom_histogram() + labs(title = "Posterior distribution of positivity rates for\nthe first week of January, 2011")
+```
+
+![](03-predictions-and-model-checking_files/figure-html/posterior-sim-model-hist-1.svg)&lt;!-- --&gt;
+
 
 ---
 class: inverse middle center subsection
 
 # Your turn!
 
+
+
+
+---
+class: inverse middle center subsection
+
+# Part 2: Model comparisons
+
+
+
+---
+
+# Are predictions or inference any good?
+
+Only if model specification matches the data-generating process
+
+![](03-predictions-and-model-checking_files/figure-html/misspecify-1.svg)&lt;!-- --&gt;
+
+---
+background-image: url(figures/mug.jpg)
+background-size: contain
+---
+
+# How do we test for misspecification?
+
+-  Examine residuals and diagostic plots: `gam.check()` part 1
+
+-  Test for residual patterns in data: `gam.check()` part 2
+
+-  Look for confounding relationships amongst variables: `concurvity()`
+
+???
+
+---
+
+# First let's simulate some data 
+
+
+```r
+set.seed(2)
+n &lt;- 400
+x1 &lt;- rnorm(n)
+x2 &lt;- rnorm(n)
+y_val &lt;- 1 + 2*cos(pi*x1) + 2/(1+exp(-5*(x2)))
+y_norm &lt;- y_val + rnorm(n, 0, 0.5)
+y_negbinom &lt;- rnbinom(n, mu = exp(y_val),size=10)
+y_binom &lt;- rbinom(n,1,prob = exp(y_val)/(1+exp(y_val)))
+```
+
+---
+
+class: inverse middle center subsection
+
+# Using `gam.check()` part 1: Visual Checks
+
+
+---
+
+# Gaussian model on Gaussian data
+
+
+```r
+norm_model &lt;- gam(y_norm ~ s(x1, k=12) + s(x2, k=12), method = 'REML')
+gam.check(norm_model, rep = 500)
+```
+
+![](03-predictions-and-model-checking_files/figure-html/gam_check_plots1-1.svg)&lt;!-- --&gt;
+
+---
+
+# Negative binomial data, Poisson model
+
+
+```r
+pois_model &lt;- gam(y_negbinom ~ s(x1, k=12) + s(x2, k=12), family=poisson, method= 'REML')
+gam.check(pois_model, rep = 500)
+```
+
+![](03-predictions-and-model-checking_files/figure-html/gam_check_plots2-1.svg)&lt;!-- --&gt;
+
+---
+
+# NB data, NB model
+
+
+```r
+negbin_model &lt;- gam(y_negbinom ~ s(x1, k=12) + s(x2, k=12), family = nb, method = 'REML')
+gam.check(negbin_model, rep = 500)
+```
+
+![](03-predictions-and-model-checking_files/figure-html/gam_check_plots3-1.svg)&lt;!-- --&gt;
+
+
+
+
+---
+class: inverse middle center subsection
+
+# `gam.check()` part 2: do you have the right functional form?
+
+---
+
+# How good is the smooth?
+
+- Many choices influence whether a smooth is right for the data, one key one is **k**, the number of basis functions used to construct the smooth.
+
+- **k** sets the _maximum_ wiggliness of a smooth.  The smoothing penalty `\((\lambda)\)` remove "extra wiggliness" (_up to a point!_)
+
+- We want enough **k** to model all our complexity, but larger **k** means larger computation time (sometimes `\(O(n^2)\)`)
+
+- Set **k** per term in your model: `s(x, k=10)` or `s(x, y, k=100)`.  Default values must be checked!
+
+---
+
+# Checking basis size
+
+`gam.check()` prints diagnostics for basis size. Significant values indicate non-random residual patterns not captured by smooths.
+
+
+
+```r
+norm_model_1 &lt;- gam(y_norm~s(x1, k = 4) + s(x2, k = 4), method = 'REML')
+gam.check(norm_model_1)
+```
+
+```
+## 
+## Method: REML   Optimizer: outer newton
+## full convergence after 8 iterations.
+## Gradient range [-0.0003467788,0.0005154578]
+## (score 736.9402 &amp; scale 2.252304).
+## Hessian positive definite, eigenvalue range [0.000346021,198.5041].
+## Model rank =  7 / 7 
+## 
+## Basis dimension (k) checking results. Low p-value (k-index&lt;1) may
+## indicate that k is too low, especially if edf is close to k'.
+## 
+##         k'  edf k-index p-value    
+## s(x1) 3.00 1.00    0.13  &lt;2e-16 ***
+## s(x2) 3.00 2.91    1.04    0.77    
+## ---
+## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
+```
+
+---
+background-image: url(figures/rookie.jpg)
+background-size: contain
+---
+
+# Checking basis size
+
+Increasing basis size can move issues to another part of the model.
+
+
+```r
+norm_model_2 &lt;- gam(y_norm ~ s(x1, k = 12) + s(x2, k = 4), method = 'REML')
+gam.check(norm_model_2)
+```
+
+```
+## 
+## Method: REML   Optimizer: outer newton
+## full convergence after 11 iterations.
+## Gradient range [-5.658609e-06,5.392657e-06]
+## (score 345.3111 &amp; scale 0.2706205).
+## Hessian positive definite, eigenvalue range [0.967727,198.6299].
+## Model rank =  15 / 15 
+## 
+## Basis dimension (k) checking results. Low p-value (k-index&lt;1) may
+## indicate that k is too low, especially if edf is close to k'.
+## 
+##          k'   edf k-index p-value   
+## s(x1) 11.00 10.84    0.99   0.330   
+## s(x2)  3.00  2.98    0.86   0.005 **
+## ---
+## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
+```
+
+---
+
+# Checking basis size
+
+Successively check issues in all smooths.
+
+
+```r
+norm_model_3 &lt;- gam(y_norm ~ s(x1, k = 12) + s(x2, k = 12),method = 'REML')
+gam.check(norm_model_3)
+```
+
+```
+## 
+## Method: REML   Optimizer: outer newton
+## full convergence after 8 iterations.
+## Gradient range [-1.136192e-08,6.794565e-13]
+## (score 334.2084 &amp; scale 0.2485446).
+## Hessian positive definite, eigenvalue range [2.812271,198.6868].
+## Model rank =  23 / 23 
+## 
+## Basis dimension (k) checking results. Low p-value (k-index&lt;1) may
+## indicate that k is too low, especially if edf is close to k'.
+## 
+##          k'   edf k-index p-value
+## s(x1) 11.00 10.85    0.98    0.29
+## s(x2) 11.00  7.95    0.95    0.14
+```
+
+---
+
+# Checking basis size
+
+![](03-predictions-and-model-checking_files/figure-html/gam_check_norm4-1.svg)&lt;!-- --&gt;
+
+---
+class: inverse center middle subsection
+
+# `concurvity()`: how independent are my variables?
+
+---
+
+# What is concurvity?
+
+- Nonlinear measure of variable relationships, similar to co-linearity
+
+- Generally a property of a _model_ and data, not data alone
+
+- In linear models, we may be concerned about co-linear variables, which we can find with `cor(data)`, or `pairs(data)` of the data
+
+- When using GAMs, we use `concurvity(model)`
+
+
+
+???
+
+Concurvity must be a model property because it depends on the type of curves allowed
+
+---
+
+# Effects of concurvity
+
+Independent variables yield nice, separable nonlinear GAM terms
+
+![](03-predictions-and-model-checking_files/figure-html/concurve1-1.svg)&lt;!-- --&gt;
+
+---
+
+# Effects of concurvity
+
+Modest dependence between predictor variables increases uncertainty.
+
+![](03-predictions-and-model-checking_files/figure-html/concurve2-1.svg)&lt;!-- --&gt;
+
+---
+
+# Effects of concurvity
+
+Smooth forms and intervals go &lt;span style="color:purple;"&gt;**buck wild**&lt;/span&gt; under strong dependence. 
+
+![](03-predictions-and-model-checking_files/figure-html/concurve4-1.svg)&lt;!-- --&gt;
+
+---
+
+# Use `concurvity()` to diagnose
+
+(It's easier to read with `round()`)
+
+
+
+.pull-left[
+
+```r
+round(concurvity(some_model), 2)
+```
+
+```
+##          para s(x1_cc) s(x2_cc)
+## worst       0     0.84     0.84
+## observed    0     0.22     0.57
+## estimate    0     0.28     0.60
+```
+
+- `full=TRUE` how much each smooth is explained by _all_ others
+- `full=FALSE` how much each smooth is explained by _each_ other 
+- 3 estimates provided
+]
+
+.pull-right[
+
+```r
+lapply(
+  concurvity(some_model, full= FALSE),
+  round, 2)
+```
+
+```
+## $worst
+##          para s(x1_cc) s(x2_cc)
+## para        1     0.00     0.00
+## s(x1_cc)    0     1.00     0.84
+## s(x2_cc)    0     0.84     1.00
+## 
+## $observed
+##          para s(x1_cc) s(x2_cc)
+## para        1     0.00     0.00
+## s(x1_cc)    0     1.00     0.57
+## s(x2_cc)    0     0.22     1.00
+## 
+## $estimate
+##          para s(x1_cc) s(x2_cc)
+## para        1     0.00      0.0
+## s(x1_cc)    0     1.00      0.6
+## s(x2_cc)    0     0.28      1.0
+```
+]
+
+---
+
+# Concurvity: Remember
+
+- Can make your model unstable to small changes
+
+- `cor(data)` not sufficient: use the `concurvity(model)` function
+
+- Not always obvious from plots of smooths!!
+
+
+---
+
+# Let's look at an example using the richness data
+
+
+
+.pull-left[
+
+```r
+# load the data
+trawls &lt;- read.csv(here("data","trawl_nl.csv"))
+trawls2010 &lt;- filter(trawls,year==2010)
+rich_tempdepth &lt;- gam(richness ~ s(log10(depth),k=30)+s(temp_bottom) + lat, 
+                       data= trawls2010,
+                       family = poisson, method ="REML")
+draw(rich_tempdepth)
+```
+
+]
+
+
+.pull-right[
+
+![](03-predictions-and-model-checking_files/figure-html/rich-spatial2-1.svg)&lt;!-- --&gt;
+
+]
+
+
+
+---
+
+
+
+.pull-left[
+
+```r
+concurvity(rich_tempdepth)
+```
+
+]
+
+
+.pull-right[
+
+
+```
+##               para s(log10(depth)) s(temp_bottom)
+## worst    0.9986329       0.7712929      0.8027293
+## observed 0.9986329       0.2205268      0.7859323
+## estimate 0.9986329       0.5174799      0.7027520
+```
+
+]
+
+
+---
+class: inverse middle center subsection
+
+# part 3: Model selection
+
+
+---
+
+# How do we choose between alternative models?
+
+- Models can differ in # of predictors, basis functions used, family, etc. 
+
+- When comparing models, we have to account for model fit and the flexibility of each model
+
+- MGCV uses the effective degrees of freedom of smooth terms when comparing models via ANOVA or AIC
+
+---
+
+
+# How do we choose between alternative models?
+
+Possible approaches:
+
+ - Look at terms within a model
+ - AIC 
+ - ANOVA table 
+ - Fitting full model and using `select = TRUE` option. 
+ 
+---
+
+# A few caveats first: 
+
+* you cannot compare models that differ in the number of data points, or in type of data (assuming count vs. continuous data, for example)
+
+* p-values for terms within each model are approximate, from ANOVA even more approximate
+
+* Make sure to use the same method ("ML", "REML" or "GCV.Cp") for all models to be compared
+
+
+---
+
+# Viewing smooth terms within a model:
+
+
+```r
+rich_tempdepth &lt;- gam(richness ~ s(log10(depth),k=30)+s(temp_bottom), 
+                      data= trawls2010,
+                      family = poisson, method ="REML")
+
+summary(rich_tempdepth)
+```
+
+```
+## 
+## Family: poisson 
+## Link function: log 
+## 
+## Formula:
+## richness ~ s(log10(depth), k = 30) + s(temp_bottom)
+## 
+## Parametric coefficients:
+##             Estimate Std. Error z value Pr(&gt;|z|)    
+## (Intercept)  3.19764    0.00923   346.4   &lt;2e-16 ***
+## ---
+## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
+## 
+## Approximate significance of smooth terms:
+##                   edf Ref.df  Chi.sq p-value    
+## s(log10(depth)) 5.032  6.343 143.301  &lt;2e-16 ***
+## s(temp_bottom)  1.002  1.004   0.635   0.428    
+## ---
+## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
+## 
+## R-sq.(adj) =  0.218   Deviance explained = 21.6%
+## -REML = 1509.9  Scale est. = 1         n = 482
+```
+
+---
+
+# Using ANOVA to compare two models
+
+
+
+```r
+rich_depth &lt;- gam(richness ~ s(log10(depth),k=30), 
+                      data= trawls2010,
+                      family = poisson, method ="REML")
+
+anova(rich_depth, rich_tempdepth,test = "Chisq")
+```
+
+```
+## Analysis of Deviance Table
+## 
+## Model 1: richness ~ s(log10(depth), k = 30)
+## Model 2: richness ~ s(log10(depth), k = 30) + s(temp_bottom)
+##   Resid. Df Resid. Dev      Df Deviance Pr(&gt;Chi)
+## 1    474.05     565.84                          
+## 2    473.10     565.67 0.94931  0.17041   0.6586
+```
+
+
+---
+
+# Using ANOVA to compare two models
+
+
+Note for anova.gam: This assumes that models do not differ in terms that can be completely smoothed away (like simple random effects). See `?anova.gam` for more details
+
+
+---
+
+# Using AIC to compare two models
+
+
+
+.pull-left[
+
+
+```r
+AIC(rich_depth, rich_tempdepth)
+```
+
+```
+##                      df      AIC
+## rich_depth     6.643459 2997.568
+## rich_tempdepth 7.582491 2999.275
+```
+]
+
+
+
+.pull-right[
+
+* A corrected version of AIC (2k - 2logLik) to account for reduced degrees of freedom from smoothing, and uncertainty in smoothing parameters.
+
+* See ?`mgcv::AIC.gam` for more details
+
+
+]
+
+---
+background-image: url(figures/wood-quote.png)
+background-size: contain
+
+---
+
+
+# Final method: selection of smooth terms within a model
+
+* If we think a given smooth term can be removed from the model, it should also be possible to penalize the term to zero within the model
+
+--
+
+* Only works if a given term is penalized; remember from day 1 that some function shapes are not penalized (are in the null space of the model)
+
+--
+
+* If we set `select=TRUE` this adds a penalty to the null space of all models, letting mgcv remove the term if need be
+
+
+---
+
+
+
+```r
+rich_tempdepth &lt;- gam(richness ~ s(log10(depth),k=30)+s(temp_bottom), 
+                      data= trawls2010,
+                      family = poisson, method ="REML", select = TRUE)
+
+summary(rich_tempdepth)
+```
+
+```
+## 
+## Family: poisson 
+## Link function: log 
+## 
+## Formula:
+## richness ~ s(log10(depth), k = 30) + s(temp_bottom)
+## 
+## Parametric coefficients:
+##             Estimate Std. Error z value Pr(&gt;|z|)    
+## (Intercept) 3.197728   0.009229   346.5   &lt;2e-16 ***
+## ---
+## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
+## 
+## Approximate significance of smooth terms:
+##                      edf Ref.df  Chi.sq p-value    
+## s(log10(depth)) 5.246284     29 159.254  &lt;2e-16 ***
+## s(temp_bottom)  0.002459      9   0.002   0.428    
+## ---
+## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
+## 
+## R-sq.(adj) =   0.22   Deviance explained = 21.6%
+## -REML = 1506.9  Scale est. = 1         n = 482
+```
+
+
+---
+
+
+
+```r
+draw(rich_tempdepth)
+```
+
+![](03-predictions-and-model-checking_files/figure-html/unnamed-chunk-7-1.svg)&lt;!-- --&gt;
     </textarea>
 <style data-target="print-only">@media screen {.remark-slide-container{display:block;}.remark-slide-scaler{box-shadow:none;}}</style>
 <script src="https://remarkjs.com/downloads/remark-latest.min.js"></script>
