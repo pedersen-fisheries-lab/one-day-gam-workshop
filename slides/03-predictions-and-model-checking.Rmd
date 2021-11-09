@@ -52,16 +52,18 @@ xaringanExtra::use_tile_view()
 
 1. Evaluating  model uncertainty and making predictions
 
+
 --
 
-2. Model selection methods:
+2. Model checking 
+
+--
+
+3. Model selection methods:
  - `select  = TRUE`
  - AIC
  - ANOVA
 
---
-
-3. Model checking 
 
 ---
 
@@ -239,7 +241,6 @@ ggplot(pred, aes(x = week_centered)) +
     geom_line(aes(y = pos_rate)) + labs(y = "Test postivity rate", x = NULL)
 ```
 
----
 
 ---
 class: inverse middle center subsection
