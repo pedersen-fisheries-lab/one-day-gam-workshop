@@ -295,7 +295,7 @@ To do this we need a few things:
 
 1. The vector of model parameters for the smooth, $\boldsymbol{\hat{\beta}}$
 2. The covariance matrix of those parameters, $\boldsymbol{\hat{V}}_{\beta}$
-3. A matrix $\boldsymbol{X}_p$ that maps parameters to the linear predictor for the smooth
+3. A matrix $\boldsymbol{X}_p$ that maps parameters to the linear predictors (i.e. basis functions) for the smooth
 
 $$\boldsymbol{\hat{\eta}}_p = \boldsymbol{X}_p \boldsymbol{\hat{\beta}}$$
 
