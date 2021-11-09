@@ -67,8 +67,7 @@ xaringanExtra::use_tile_view()
 
 # Recap &mdash; Flu data
 
-.row[
-.col-6[
+.pull-left[
 ```{r load-flu}
 
 flu <- read.csv(here('data',"california-flu-data.csv")) %>%
@@ -85,14 +84,15 @@ flu2010_posmod <- gam(tests_pos ~ s(week_centered, k = 15, by = ) + offset(log(t
                             method = "REML")
 
 ```
+
 ]
-.col-6[
+.pull-right[
 ```{r richness-violin, fig.height=5, fig.width=5, echo=FALSE}
 ggplot(flu2010, aes(x =week_centered, y=tests_pos/tests_total)) +
     geom_point()+
     labs(x="Week (centered)", y="Fraction of positive tests")
 ```
-]
+
 ]
 
 ---

@@ -33,10 +33,31 @@ plot(flu2010_posmod)
 draw(flu2010_posmod)
 
 
+
 sm_fit <- evaluate_smooth(flu2010_posmod, 's(week_centered)') # tidy data on smooth
 sm_post <- smooth_samples(flu2010_posmod, 's(week_centered)', n = 20, seed = 42) # more on this later
 draw(sm_fit) + geom_line(data = sm_post, aes(x = .x1, y = value, group = draw),
                          alpha = 0.3, colour = 'red')
+
+
+
+
+new_flu <- with(flu2010, tibble(week_centered = seq(min(week_centered), max(week_centered), length.out = 100),
+                                tests_total = 1))
+pred <- predict(flu2010_posmod, newdata = new_flu, se.fit = TRUE, type = 'link')
+pred <- bind_cols(new_flu, as_tibble(as.data.frame(pred)))
+pred
+
+ilink <- inv_link(flu2010_posmod)                         # inverse link function
+crit <- qnorm((1 - 0.89) / 2, lower.tail = FALSE) # or just `crit <- 2`
+pred <- mutate(pred, pos_rate = ilink(fit),
+               lwr = ilink(fit - (crit * se.fit)), # lower...
+               upr = ilink(fit + (crit * se.fit))) # upper credible interval
+pred
+
+ggplot(pred, aes(x = week_centered)) +
+  geom_ribbon(aes(ymin = lwr, ymax = upr), alpha = 0.2) +
+  geom_line(aes(y = pos_rate)) + labs(y = "Test postivity rate", x = NULL)
 
 
 

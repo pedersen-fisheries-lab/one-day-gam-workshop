@@ -44,8 +44,7 @@ class: inverse, middle, left, my-title-slide, title-slide
 
 # Recap &amp;mdash; Flu data
 
-.row[
-.col-6[
+.pull-left[
 
 ```r
 flu &lt;- read.csv(here('data',"california-flu-data.csv")) %&gt;%
@@ -62,10 +61,11 @@ flu2010_posmod &lt;- gam(tests_pos ~ s(week_centered, k = 15, by = ) + offset(lo
                             family = poisson,
                             method = "REML")
 ```
+
 ]
-.col-6[
+.pull-right[
 ![](03-predictions-and-model-checking_files/figure-html/richness-violin-1.svg)&lt;!-- --&gt;
-]
+
 ]
 
 ---
@@ -1066,11 +1066,11 @@ background-size: contain
 
 
 ```r
-rich_tempdepth &lt;- gam(richness ~ s(log10(depth),k=30)+s(temp_bottom), 
+rich_tempdepth_nonull &lt;- gam(richness ~ s(log10(depth),k=30)+s(temp_bottom), 
                       data= trawls2010,
                       family = poisson, method ="REML", select = TRUE)
 
-summary(rich_tempdepth)
+summary(rich_tempdepth_nonull)
 ```
 
 ```
@@ -1104,10 +1104,20 @@ summary(rich_tempdepth)
 
 
 ```r
-draw(rich_tempdepth)
+draw(rich_tempdepth_nonull)
 ```
 
 ![](03-predictions-and-model-checking_files/figure-html/unnamed-chunk-7-1.svg)&lt;!-- --&gt;
+
+
+
+
+---
+
+class: inverse middle center subsection
+
+# Final exercise
+
     </textarea>
 <style data-target="print-only">@media screen {.remark-slide-container{display:block;}.remark-slide-scaler{box-shadow:none;}}</style>
 <script src="https://remarkjs.com/downloads/remark-latest.min.js"></script>
