@@ -48,5 +48,17 @@ The course website URL  available at [pedersen-fisheries-lab.github.io/one-day-g
 
 [Day 2 slides](slides/02-extending-gams.html)
 
+[Day 2 script](scripts/02-extending-gams.R)
+
+
+
+
+## Day 3
+
+
+[Day 3 slides](slides/03-predictions-and-model-checking.html)
+
+[Day 3 script](scripts/03-predictions-and-model-checking.R)
+
 
 
