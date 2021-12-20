@@ -1,4 +1,4 @@
-# One-day Introduction to GAMs workshop
+# Introduction to GAMs workshop
 
 A short course on how to fit, plot, and evaluate GAMs
 
@@ -40,7 +40,7 @@ The course website URL  available at [pedersen-fisheries-lab.github.io/one-day-g
 
 [Day 1 script](scripts/01-intro-to-gams.R)
 
-[Day 1 solutions](scripts/01-intro-to-gams - solutions.R)
+[Day 1 solutions](scripts/01-intro-to-gams-solutions.R)
 
 
 
